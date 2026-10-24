@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Technician {
+  id          String    @id
+  name        String
+  initials    String
+  category    String
+  district    String
+  description String
+  price       Int
+  color       String
+  bookings    Booking[]
+  slots       Slot[]
+}
+
+model Booking {
+  id           String     @id @default(cuid())
+  reference    String     @unique
+  ownerHash    String
+  customerName String
+  phone        String
+  address      String
+  details      String
+  date         String
+  time         String
+  status       String     @default("PENDING")
+  price        Int
+  createdAt    DateTime   @default(now())
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  slot         Slot?
+
+  @@index([ownerHash, createdAt])
+}
+
+model Slot {
+  id           String     @id @default(cuid())
+  technicianId String
+  date         String
+  time         String
+  bookingId    String     @unique
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  booking      Booking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([technicianId, date, time])
+}

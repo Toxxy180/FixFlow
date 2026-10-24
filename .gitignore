@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+.env
+.env.*
+!.env.example
+!.env.local.example
+.prisma/
+*.log
+*.db
+*.db-journal
+*.tsbuildinfo
+playwright-report/
+test-results/

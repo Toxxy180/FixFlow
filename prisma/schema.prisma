@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  CUSTOMER
+  TECHNICIAN
+  ADMIN
+}
+
+enum JobStatus {
+  PENDING
+  ACCEPTED
+  ON_THE_WAY
+  IN_PROGRESS
+  AWAITING_PAYMENT
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
+enum ApplicationStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AppUser {
+  id         String   @id @db.Uuid
+  email      String   @unique
+  name       String
+  phone      String   @default("")
+  avatarPath String?
+  role       Role     @default(CUSTOMER)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  technician Technician?
+  bookings   Booking[]
+  reviews    Review[]
+  history    JobStatusHistory[]
+  auditLogs  AuditLog[]
+  images     UserImage[]
+  @@index([role, active])
+}
+
+model District {
+  id          String @id
+  name        String @unique
+  technicians TechnicianDistrict[]
+  bookings    Booking[]
+}
+
+model ServiceCategory {
+  id          String @id
+  name        String
+  active      Boolean @default(true)
+  services    Service[]
+  technicians Technician[]
+}
+
+model Service {
+  id          String @id @default(cuid())
+  name        String
+  description String @default("")
+  categoryId  String
+  category    ServiceCategory @relation(fields: [categoryId], references: [id])
+  price       Int
+  active      Boolean @default(true)
+  bookings    Booking[]
+  @@index([categoryId, active])
+}
+
+model Technician {
+  id          String @id @default(cuid())
+  name        String
+  initials    String
+  category    String
+  categoryModel ServiceCategory @relation(fields: [category], references: [id])
+  district    String
+  description String
+  price       Int
+  color       String @default("blue")
+  experience  Int @default(0)
+  portfolioPaths String[] @default([])
+  portfolioUrl String @default("")
+  applicationStatus ApplicationStatus @default(NONE)
+  applicationSubmittedAt DateTime?
+  applicationReviewedAt DateTime?
+  applicationReviewNote String @default("")
+  active      Boolean @default(true)
+  userId      String? @unique @db.Uuid
+  user        AppUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  workDays    Int[] @default([0, 1, 2, 3, 4, 5, 6])
+  availableTimes String[] @default(["09:00", "11:00", "13:00", "15:00"])
+  areas       TechnicianDistrict[]
+  bookings    Booking[]
+  slots       Slot[]
+  reviews     Review[]
+  @@index([category, active])
+}
+
+model UserImage {
+  id        String @id @default(cuid())
+  ownerId   String @db.Uuid
+  owner     AppUser @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  kind      String
+  path      String @unique
+  createdAt DateTime @default(now())
+  @@index([ownerId, kind])
+}
+
+model TechnicianDistrict {
+  technicianId String
+  districtId   String
+  technician   Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  district     District @relation(fields: [districtId], references: [id])
+  @@id([technicianId, districtId])
+  @@index([districtId])
+}
+
+model Booking {
+  id           String @id @default(cuid())
+  reference    String @unique
+  customerId   String @db.Uuid
+  customer     AppUser @relation(fields: [customerId], references: [id])
+  customerName String
+  phone        String
+  address      String
+  districtId   String
+  district     District @relation(fields: [districtId], references: [id])
+  details      String
+  date         String
+  time         String
+  status       JobStatus @default(PENDING)
+  serviceId    String
+  service      Service @relation(fields: [serviceId], references: [id])
+  serviceName  String
+  price        Int
+  travelFee    Int @default(0)
+  totalAmount  Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  slot         Slot?
+  payment      Payment?
+  parts        JobPartItem[]
+  history      JobStatusHistory[]
+  review       Review?
+  @@index([customerId, createdAt])
+  @@index([technicianId, status, date])
+  @@index([status, createdAt])
+}
+
+model Slot {
+  id           String @id @default(cuid())
+  technicianId String
+  date         String
+  time         String
+  bookingId    String @unique
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  booking      Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  @@unique([technicianId, date, time])
+}
+
+model JobStatusHistory {
+  id        String @id @default(cuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  actorId   String @db.Uuid
+  actor     AppUser @relation(fields: [actorId], references: [id])
+  status    JobStatus
+  note      String @default("")
+  createdAt DateTime @default(now())
+  @@index([bookingId, createdAt])
+}
+
+model JobPartItem {
+  id        String @id @default(cuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  name      String
+  quantity  Int
+  unitPrice Int
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id        String @id @default(cuid())
+  bookingId String @unique
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount    Int
+  status    PaymentStatus @default(UNPAID)
+  mode      String @default("DEMO")
+  paidAt    DateTime?
+}
+
+model Review {
+  id           String @id @default(cuid())
+  bookingId    String @unique
+  booking      Booking @relation(fields: [bookingId], references: [id])
+  customerId   String @db.Uuid
+  customer     AppUser @relation(fields: [customerId], references: [id])
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  rating       Int
+  comment      String @default("")
+  createdAt    DateTime @default(now())
+  @@index([technicianId])
+}
+
+model AppSetting {
+  id                String @id @default("main")
+  siteName          String @default("FixFlow")
+  contactEmail      String @default("")
+  contactPhone      String @default("")
+  bookingEnabled    Boolean @default(true)
+  maxAdvanceDays    Int @default(90)
+  cancelBeforeHours Int @default(2)
+  travelFee         Int @default(100)
+  updatedAt         DateTime @updatedAt
+}
+
+model RateLimit {
+  key       String @id
+  count     Int
+  expiresAt DateTime
+}
+
+model AuditLog {
+  id        String @id @default(cuid())
+  actorId   String @db.Uuid
+  actor     AppUser @relation(fields: [actorId], references: [id])
+  action    String
+  targetId  String
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}

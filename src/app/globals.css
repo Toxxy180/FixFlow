@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+@import '@fontsource/noto-sans-thai/400.css';
+@import '@fontsource/noto-sans-thai/600.css';
+@import '@fontsource/noto-sans-thai/700.css';
+
+@theme inline {
+  --color-primary: #0866ff;
+  --color-ink: #10203f;
+  --color-muted: #64748b;
+  --color-line: #dce3ee;
+  --color-soft: #edf5ff;
+  --font-sans: 'Noto Sans Thai', sans-serif;
+}
+
+body {
+  @apply bg-white text-ink font-sans antialiased;
+}
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled),
+select {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: wait;
+}
+:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 3px;
+}
+@layer components {
+  .shell {
+    @apply mx-auto w-full max-w-[1376px] px-8 max-sm:px-5;
+  }
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-base font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line bg-white px-3.5 py-3 text-sm text-ink placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-blue-100;
+  }
+  .label {
+    @apply mb-2 block text-sm font-semibold;
+  }
+  .avatar-blue {
+    @apply bg-blue-100 text-blue-900;
+  }
+  .avatar-amber {
+    @apply bg-orange-100 text-orange-900;
+  }
+  .avatar-teal {
+    @apply bg-emerald-100 text-emerald-900;
+  }
+  .avatar-purple {
+    @apply bg-violet-100 text-violet-900;
+  }
+  .panel {
+    @apply rounded-xl border border-line bg-white p-6 max-sm:p-4;
+  }
+  .page-title {
+    @apply text-3xl font-bold tracking-tight max-sm:text-2xl;
+  }
+  .section-title {
+    @apply text-xl font-semibold;
+  }
+}
+.service-tabs {
+  scrollbar-width: none;
+}
+.service-tabs::-webkit-scrollbar {
+  display: none;
+}
+summary::marker {
+  color: #0866ff;
+}
+dialog {
+  @apply max-h-[90dvh] w-[600px] max-w-[calc(100%-32px)] overflow-y-auto rounded-2xl bg-white p-0 text-ink shadow-2xl;
+  margin: auto;
+}
+dialog::backdrop {
+  background: rgb(16 32 63 / 40%);
+  backdrop-filter: blur(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

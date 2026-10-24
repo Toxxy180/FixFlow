@@ -1,0 +1,54 @@
+{
+  "name": "fixflow",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "prisma generate && next build --webpack",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:setup": "prisma migrate deploy && node prisma/seed.mjs",
+    "db:local": "prisma dev --name fixflow --port 51213 --db-port 51214 --shadow-db-port 51215",
+    "dev:demo": "node scripts/dev-demo.mjs",
+    "db:seed:demo": "node scripts/seed-demo.mjs",
+    "admin:grant": "node --env-file=.env scripts/grant-admin.mjs",
+    "check:deploy": "node --env-file=.env scripts/check-deploy.mjs",
+    "test": "tsx --test tests/unit.test.ts",
+    "test:db": "tsx --env-file=.env --test tests/booking.integration.test.ts",
+    "test:accounts": "tsx --env-file=.env --test tests/user-management.integration.test.ts",
+    "test:profile": "tsx --env-file=.env --test tests/account-profile.integration.test.ts",
+    "db:seed": "node prisma/seed.mjs",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@fontsource/noto-sans-thai": "^5.3.0",
+    "@prisma/client": "6.19.3",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.80.0",
+    "lucide-react": "^0.468.0",
+    "next": "16.4.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
+    "zod": "^4.0.0"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "prettier": "^3.9.10",
+    "prisma": "6.19.3",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,7 @@
+node_modules
+.next
+package-lock.json
+prisma/migrations
+prisma/legacy-sqlite
+docs/*.png
+.env*
