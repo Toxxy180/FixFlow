@@ -19,7 +19,7 @@ import {
 } from '@/lib/auth-validation';
 import { destinationAfterAuth, syncVerifiedProfile } from '@/lib/auth-profile';
 import { googleAuthEnabled } from '@/lib/auth-providers';
-import { issueRecoveryTicket, consumeRecoveryTicket } from '@/lib/auth-recovery';
+import { consumeRecoveryTicket } from '@/lib/auth-recovery';
 
 async function throttle(kind: string, email: string, limit: number, seconds: number) {
   const ip = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
@@ -149,39 +149,16 @@ export async function sendPasswordReset(input: string): Promise<AuthActionResult
   if (!email.success || !hasSupabase()) return { error: 'กรุณากรอกอีเมลให้ถูกต้อง' };
   try {
     if (!(await throttle('send', email.data, 1, 60)) || !(await throttle('send-ip', '', 10, 900)))
-      return { error: 'ขอรหัสบ่อยเกินไป กรุณารอสักครู่' };
-    const { error } = await (await createClient()).auth.resetPasswordForEmail(email.data);
-    if (error) return { error: 'ส่งรหัสไม่สำเร็จ กรุณาลองใหม่' };
-    return { success: true, step: 'VERIFY' };
+      return { error: 'ขอลิงก์บ่อยเกินไป กรุณารอสักครู่' };
+    const { error } = await (
+      await createClient()
+    ).auth.resetPasswordForEmail(email.data, {
+      redirectTo: `${applicationOrigin()}/auth/callback`,
+    });
+    if (error) return { error: 'ส่งลิงก์ไม่สำเร็จ กรุณาลองใหม่' };
+    return { success: true, step: 'EMAIL_SENT' };
   } catch {
     return { error: 'เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่' };
-  }
-}
-
-export async function verifyRecoveryCode(input: string, token: string): Promise<AuthActionResult> {
-  const email = emailSchema.safeParse(input.trim());
-  if (!email.success || !/^\d{6,8}$/.test(token) || !hasSupabase())
-    return { error: 'กรุณาตรวจสอบอีเมลและรหัสยืนยัน' };
-  try {
-    if (!(await throttle('verify', email.data, 10, 600)))
-      return { error: 'ลองรหัสบ่อยเกินไป กรุณารอสักครู่' };
-    const client = await createClient();
-    const { data, error } = await client.auth.verifyOtp({
-      email: email.data,
-      token,
-      type: 'recovery',
-    });
-    if (error || !data.user?.email_confirmed_at)
-      return { error: 'รหัสไม่ถูกต้องหรือหมดอายุ กรุณาขอรหัสใหม่' };
-    const profile = await syncVerifiedProfile(data.user);
-    if (!profile.active) {
-      await client.auth.signOut();
-      return { error: 'บัญชีนี้ถูกระงับ กรุณาติดต่อผู้ดูแลระบบ' };
-    }
-    await issueRecoveryTicket(data.user.id);
-    return { success: true, step: 'RESET' };
-  } catch {
-    return { error: 'ยืนยันไม่สำเร็จ กรุณาลองใหม่' };
   }
 }
 
@@ -191,15 +168,18 @@ export async function resetAccountPassword(form: FormData): Promise<AuthActionRe
   try {
     const user = await requireUser('/forgot-password');
     if (!(await consumeRecoveryTicket(user.id)))
-      return { error: 'กรุณาขอและยืนยัน OTP ใหม่ก่อนตั้งรหัสผ่าน' };
+      return { error: 'กรุณาขอลิงก์ใหม่จากหน้าลืมรหัสผ่าน แล้วคลิกลิงก์ในอีเมลก่อนตั้งรหัสผ่าน' };
     const client = await createClient();
     const { error } = await client.auth.updateUser({ password: parsed.data.password });
-    if (error) return { error: 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาขอ OTP ใหม่แล้วลองอีกครั้ง' };
+    if (error)
+      return {
+        error: 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาขอลิงก์ใหม่จากหน้าลืมรหัสผ่านแล้วลองอีกครั้ง',
+      };
     await client.auth.signOut({ scope: 'global' });
     revalidatePath('/', 'layout');
     return { success: true, redirectTo: '/login?message=password-updated' };
   } catch {
-    return { error: 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาขอ OTP ใหม่แล้วลองอีกครั้ง' };
+    return { error: 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาขอลิงก์ใหม่จากหน้าลืมรหัสผ่านแล้วลองอีกครั้ง' };
   }
 }
 

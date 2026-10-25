@@ -10,7 +10,6 @@ import {
   resendSignupCode,
   verifyRegistration,
   sendPasswordReset,
-  verifyRecoveryCode,
   resetAccountPassword,
   startGoogleLogin,
 } from '@/app/auth/actions';
@@ -24,16 +23,18 @@ export function LoginForm({
   googleEnabled = false,
   mode = 'login',
   notice = '',
+  initialStep = 'FORM',
 }: {
   demo?: boolean;
   configured: boolean;
   googleEnabled?: boolean;
   mode?: Mode;
   notice?: string;
+  initialStep?: 'FORM' | 'RESET';
 }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
-  const [step, setStep] = useState<'FORM' | 'VERIFY' | 'RESET'>('FORM');
+  const [step, setStep] = useState<'FORM' | 'VERIFY' | 'EMAIL_SENT' | 'RESET'>(initialStep);
   const [signupType, setSignupType] = useState<'CUSTOMER' | 'TECHNICIAN'>('CUSTOMER');
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
@@ -50,19 +51,22 @@ export function LoginForm({
   const title =
     step === 'RESET'
       ? 'ตั้งรหัสผ่านใหม่'
-      : step === 'VERIFY'
-        ? 'ยืนยันอีเมล'
-        : mode === 'register'
-          ? 'สร้างบัญชี FixFlow'
-          : mode === 'forgot'
-            ? 'ลืมรหัสผ่าน'
-            : 'เข้าสู่ระบบ';
+      : step === 'EMAIL_SENT'
+        ? 'ตรวจสอบอีเมลของคุณ'
+        : step === 'VERIFY'
+          ? 'ยืนยันอีเมล'
+          : mode === 'register'
+            ? 'สร้างบัญชี FixFlow'
+            : mode === 'forgot'
+              ? 'ลืมรหัสผ่าน'
+              : 'เข้าสู่ระบบ';
   function handle(result: AuthActionResult) {
     if (result.error) setError(result.error);
     if (result.step) {
       setStep(result.step);
       setToken('');
-      if (!result.error && result.step === 'VERIFY') setCooldown(60);
+      if (!result.error && (result.step === 'VERIFY' || result.step === 'EMAIL_SENT'))
+        setCooldown(60);
     }
     if (result.redirectTo) {
       router.replace(result.redirectTo);
@@ -73,17 +77,17 @@ export function LoginForm({
     <div className="rounded-2xl border border-line bg-white p-8 max-sm:p-5">
       <h1 className="text-3xl font-bold max-sm:text-2xl">{title}</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted">
-        {step === 'VERIFY'
-          ? mode === 'forgot'
-            ? `หากมีบัญชี ${email} ระบบจะส่งรหัสสำหรับตั้งรหัสผ่านให้`
-            : `กรอกรหัสที่ส่งไปยัง ${email} เพื่อยืนยันบัญชี`
-          : step === 'RESET'
-            ? 'ตั้งรหัสผ่านสำหรับเข้าสู่ระบบครั้งต่อไป'
-            : mode === 'register'
-              ? 'เลือกประเภทบัญชี กรอกข้อมูล และยืนยันอีเมลด้วย OTP'
-              : mode === 'forgot'
-                ? 'รับ OTP ทางอีเมลเพื่อตั้งรหัสผ่านใหม่ หรือเพิ่มรหัสผ่านให้บัญชีเดิม'
-                : 'ใช้อีเมลและรหัสผ่าน หรือเข้าสู่ระบบด้วย Google'}
+        {step === 'EMAIL_SENT'
+          ? `หากมีบัญชี ${email} ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้ กรุณาเปิดอีเมลแล้วคลิกลิงก์ในเบราว์เซอร์เดียวกับที่ขอ`
+          : step === 'VERIFY'
+            ? `กรอกรหัสที่ส่งไปยัง ${email} เพื่อยืนยันบัญชี`
+            : step === 'RESET'
+              ? 'ตั้งรหัสผ่านสำหรับเข้าสู่ระบบครั้งต่อไป'
+              : mode === 'register'
+                ? 'เลือกประเภทบัญชี กรอกข้อมูล และยืนยันอีเมลด้วย OTP'
+                : mode === 'forgot'
+                  ? 'กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่ หรือเพิ่มรหัสผ่านให้บัญชีเดิม'
+                  : 'ใช้อีเมลและรหัสผ่าน หรือเข้าสู่ระบบด้วย Google'}
       </p>
       {notice && !error ? (
         <p role="status" className="mt-4 rounded-lg bg-blue-50 p-3 text-sm text-primary">
@@ -94,7 +98,7 @@ export function LoginForm({
         className="mt-6 space-y-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (pending) return;
+          if (pending || step === 'EMAIL_SENT') return;
           const data = new FormData(event.currentTarget);
           setError('');
           setMessage('');
@@ -114,12 +118,7 @@ export function LoginForm({
           }
           start(async () => {
             try {
-              if (step === 'VERIFY')
-                handle(
-                  await (mode === 'forgot'
-                    ? verifyRecoveryCode(email, token)
-                    : verifyRegistration(email, token)),
-                );
+              if (step === 'VERIFY') handle(await verifyRegistration(email, token));
               else if (step === 'RESET') handle(await resetAccountPassword(data));
               else if (mode === 'register') handle(await registerAccount(data));
               else if (mode === 'forgot') handle(await sendPasswordReset(email));
@@ -270,30 +269,48 @@ export function LoginForm({
             ระบบบัญชียังไม่พร้อม กรุณาติดต่อผู้ดูแลระบบ
           </p>
         ) : null}
-        <button
-          type="submit"
-          className="btn min-h-12 w-full"
-          disabled={pending || !ready || !configured}
-        >
-          {pending ? (
-            <>
-              <LoaderCircle size={18} className="animate-spin" />
-              กำลังดำเนินการ...
-            </>
-          ) : step === 'VERIFY' ? (
-            'ยืนยัน OTP'
-          ) : step === 'RESET' ? (
-            'บันทึกรหัสผ่านใหม่'
-          ) : mode === 'register' ? (
-            'สมัครสมาชิกและรับ OTP'
-          ) : mode === 'forgot' ? (
-            'ส่งรหัสสำหรับตั้งรหัสผ่าน'
-          ) : (
-            'เข้าสู่ระบบ'
-          )}
-        </button>
+        {step === 'EMAIL_SENT' ? (
+          <div
+            role="status"
+            className="rounded-lg bg-blue-50 p-4 text-sm leading-relaxed text-primary"
+          >
+            คลิกลิงก์ในอีเมลเพื่อเปิดหน้าตั้งรหัสผ่านใหม่
+            หากไม่พบอีเมลให้ตรวจสอบโฟลเดอร์สแปมหรือจดหมายขยะ
+          </div>
+        ) : (
+          <button
+            type="submit"
+            className="btn min-h-12 w-full"
+            disabled={pending || !ready || !configured}
+          >
+            {pending ? (
+              <>
+                <LoaderCircle size={18} className="animate-spin" />
+                กำลังดำเนินการ...
+              </>
+            ) : step === 'VERIFY' ? (
+              'ยืนยัน OTP'
+            ) : step === 'RESET' ? (
+              'บันทึกรหัสผ่านใหม่'
+            ) : mode === 'register' ? (
+              'สมัครสมาชิกและรับ OTP'
+            ) : mode === 'forgot' ? (
+              'ส่งลิงก์ตั้งรหัสผ่านใหม่'
+            ) : (
+              'เข้าสู่ระบบ'
+            )}
+          </button>
+        )}
       </form>
-      {step === 'VERIFY' ? (
+      {step === 'RESET' ? (
+        <Link
+          href="/forgot-password"
+          className="mt-4 block text-center text-sm font-semibold text-primary"
+        >
+          ขอลิงก์ตั้งรหัสผ่านใหม่
+        </Link>
+      ) : null}
+      {step === 'VERIFY' || step === 'EMAIL_SENT' ? (
         <div className="mt-4 flex flex-wrap justify-between gap-3 text-sm">
           <button
             type="button"
@@ -304,21 +321,33 @@ export function LoginForm({
               setMessage('');
               start(async () => {
                 try {
-                  const result = await (mode === 'forgot'
+                  const result = await (step === 'EMAIL_SENT'
                     ? sendPasswordReset(email)
                     : resendSignupCode(email));
                   if (result.error) setError(result.error);
                   else {
                     setCooldown(60);
-                    setMessage('หากอีเมลตรงกับบัญชีที่รอยืนยัน ระบบจะส่งรหัสใหม่ให้แล้ว');
+                    setMessage(
+                      step === 'EMAIL_SENT'
+                        ? 'หากมีบัญชีที่ใช้อีเมลนี้ ระบบจะส่งลิงก์ใหม่ให้ กรุณาใช้ลิงก์จากอีเมลล่าสุด'
+                        : 'หากอีเมลตรงกับบัญชีที่รอยืนยัน ระบบจะส่งรหัสใหม่ให้แล้ว',
+                    );
                   }
                 } catch {
-                  setError('ส่งรหัสไม่สำเร็จ กรุณาลองใหม่');
+                  setError(
+                    step === 'EMAIL_SENT'
+                      ? 'ส่งลิงก์ไม่สำเร็จ กรุณาลองใหม่'
+                      : 'ส่งรหัสไม่สำเร็จ กรุณาลองใหม่',
+                  );
                 }
               });
             }}
           >
-            {cooldown ? `ส่งใหม่ใน ${cooldown} วินาที` : 'ส่งรหัสอีกครั้ง'}
+            {cooldown
+              ? `ส่งใหม่ใน ${cooldown} วินาที`
+              : step === 'EMAIL_SENT'
+                ? 'ส่งลิงก์อีกครั้ง'
+                : 'ส่งรหัสอีกครั้ง'}
           </button>
           <button
             type="button"

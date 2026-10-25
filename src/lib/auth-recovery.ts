@@ -24,6 +24,13 @@ export async function issueRecoveryTicket(userId: string) {
     maxAge: 600,
   });
 }
+export async function hasRecoveryTicket(userId: string) {
+  const ticket = (await cookies()).get(cookieName)?.value;
+  if (!ticket || !/^[a-f0-9]{64}$/.test(ticket)) return false;
+  const record = await prisma.rateLimit.findUnique({ where: { key: ticketKey(userId, ticket) } });
+  return !!record && record.expiresAt.getTime() > Date.now();
+}
+
 export async function consumeRecoveryTicket(userId: string) {
   const jar = await cookies();
   const ticket = jar.get(cookieName)?.value;

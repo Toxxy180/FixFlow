@@ -32,4 +32,4 @@ export type ActionResult = {
   reference?: string;
   redirectTo?: string;
 };
-export type AuthActionResult = ActionResult & { step?: 'VERIFY' | 'RESET' };
+export type AuthActionResult = ActionResult & { step?: 'VERIFY' | 'EMAIL_SENT' | 'RESET' };

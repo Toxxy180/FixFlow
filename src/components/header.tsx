@@ -23,7 +23,7 @@ export function Header({ user, siteName }: { user: PublicUser | null; siteName: 
           </span>
           {siteName}
         </Link>
-        {['/login', '/register', '/forgot-password'].includes(pathname) ? (
+        {['/login', '/register', '/forgot-password', '/reset-password'].includes(pathname) ? (
           <Link
             href="/"
             className="ml-auto flex items-center gap-2 text-sm font-semibold text-primary"

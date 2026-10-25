@@ -23,11 +23,13 @@ export default async function LoginPage({
   const notice =
     params.message === 'password-updated'
       ? 'บันทึกรหัสผ่านแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่'
-      : params.error === 'google'
-        ? 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่หรือใช้อีเมลและรหัสผ่าน'
-        : params.error === 'suspended'
-          ? 'บัญชีนี้ถูกระงับ กรุณาติดต่อผู้ดูแลระบบ'
-          : '';
+      : params.error === 'auth'
+        ? 'ยืนยันตัวตนไม่สำเร็จ ลิงก์อาจหมดอายุหรือถูกใช้แล้ว กรุณาขอลิงก์ใหม่จากหน้าลืมรหัสผ่าน หรือเริ่มเข้าสู่ระบบอีกครั้ง'
+        : params.error === 'google'
+          ? 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่หรือใช้อีเมลและรหัสผ่าน'
+          : params.error === 'suspended'
+            ? 'บัญชีนี้ถูกระงับ กรุณาติดต่อผู้ดูแลระบบ'
+            : '';
   return (
     <AuthPageShell>
       <LoginForm
