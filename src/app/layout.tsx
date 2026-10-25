@@ -47,8 +47,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               {settings?.contactEmail ? (
                 <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>
               ) : null}
-              <span>WebApps Mini Project · กรุงเทพมหานคร</span>
-            </div>
+              </div>
           </div>
         </footer>
       </body>
