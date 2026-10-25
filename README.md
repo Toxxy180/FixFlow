@@ -1,4 +1,4 @@
-# FixFlow — WebApps Mini Project - Version2
+# FixFlow — WebApps Mini Project - Version2 - Pull
 
 ระบบจองช่างในกรุงเทพมหานคร 50 เขต ด้วย Next.js 16, TypeScript, Tailwind CSS 4, Prisma 6 และ PostgreSQL พร้อม Supabase Auth: อีเมล/รหัสผ่าน, OTP ยืนยันสมัครสมาชิก และ Google
 
