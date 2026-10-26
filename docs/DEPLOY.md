@@ -9,7 +9,7 @@
 ในเมนู **Connect** คัดลอก Session pooler และ Transaction pooler จากโปรเจกต์จริง ห้ามเดาชื่อ host
 
 - Session pooler พอร์ต 5432 ใช้เป็น `DIRECT_URL` สำหรับ migration และรองรับ IPv4
-- Transaction pooler พอร์ต 6543 ใช้เป็น `DATABASE_URL` สำหรับ Vercel เพิ่ม `pgbouncer=true&connection_limit=5&sslmode=require`
+- Transaction pooler พอร์ต 6543 ใช้เป็น `DATABASE_URL` สำหรับ Vercel เพิ่ม `pgbouncer=true&connection_limit=5&sslmode=require&connect_timeout=15&pool_timeout=30`
 - ถ้ารหัสผ่านมีอักขระพิเศษ ต้อง URL-encode เฉพาะส่วนรหัสผ่าน
 
 เริ่มตั้งค่าใน `.env` ตาม `.env.example` ก่อน bootstrap ใช้ database owner สำหรับทั้งสอง URL ได้ชั่วคราว แล้วเปลี่ยน DATABASE_URL เป็น runtime role ตามขั้นตอน 3 ก่อน deploy
@@ -145,3 +145,9 @@ Preview และ Production ควรใช้ Supabase projects คนละ�
 - [SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
 - [Prisma + Supabase](https://supabase.com/docs/guides/database/prisma)
 - [Vercel Git deployments](https://vercel.com/docs/git)
+
+## กรณีรอ connection pool เกินเวลา
+
+`connect_timeout=15` คือเวลารอเปิด connection ส่วน `pool_timeout=30` คือเวลารอ connection ว่างจาก pool ของ Prisma ค่าเหล่านี้มีหน่วยเป็นวินาทีและทำหน้าที่ต่างกัน การเพิ่ม connect_timeout อย่างเดียวไม่เพิ่มเวลารอคิว ค่า runtime ตัวอย่างคง connection_limit=5 และให้เวลารอคิว 30 วินาทีเพื่อรองรับการเริ่มเชื่อมต่อที่ช้า
+
+หลังแก้ DATABASE_URL ใน .env ให้หยุด dev server ด้วย Ctrl+C แล้วรัน npm.cmd run dev ใหม่ เพื่อสร้าง Prisma Client instance ที่ใช้ค่าใหม่ หากยังเกิด P2024 ให้ตรวจเวลาของ query, transaction ที่ค้าง, จำนวน process/instance และขีดจำกัด connection ของ Supabase ก่อนเพิ่ม connection_limit หรือเวลารออีก การเพิ่ม timeout ไม่ได้ทำให้ query เร็วขึ้น

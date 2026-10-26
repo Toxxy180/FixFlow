@@ -6,11 +6,11 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "prisma generate && next dev --webpack",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "db:setup": "prisma migrate deploy && node prisma/seed.mjs",
+    "db:setup": "prisma migrate deploy && prisma generate && node prisma/seed.mjs",
     "db:local": "prisma dev --name fixflow --port 51213 --db-port 51214 --shadow-db-port 51215",
     "dev:demo": "node scripts/dev-demo.mjs",
     "db:seed:demo": "node scripts/seed-demo.mjs",
