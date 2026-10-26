@@ -1,3 +1,4 @@
+import { isAccountAllowed } from '@/lib/account-status';
 import { Prisma, type AppUser } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from './prisma';
@@ -49,7 +50,7 @@ export async function submitTechnicianApplication(actor: Pick<AppUser, 'id'>, in
         where: { id: actor.id },
         include: { technician: true },
       });
-      if (!user?.active || user.role !== 'CUSTOMER')
+      if (!user || !isAccountAllowed(user) || user.role !== 'CUSTOMER')
         throw new UserError('สมัครช่างได้จากบัญชีลูกค้าที่เปิดใช้งานเท่านั้น');
       if (user.technician?.applicationStatus === 'APPROVED')
         throw new UserError('ใบสมัครนี้ได้รับอนุมัติแล้ว');
@@ -88,7 +89,7 @@ export async function submitTechnicianApplication(actor: Pick<AppUser, 'id'>, in
       await tx.technicianDistrict.createMany({
         data: ids.map((districtId) => ({ technicianId: technician.id, districtId })),
       });
-      await tx.appUser.update({ where: { id: user.id }, data: { name: profile.name, phone } });
+      await tx.appUser.update({ where: { id: user.id }, data: { phone } });
       await tx.auditLog.create({
         data: { actorId: user.id, action: 'APPLY_TECHNICIAN', targetId: technician.id },
       });
@@ -107,7 +108,8 @@ export async function approveTechnicianApplication(tx: Prisma.TransactionClient,
     !technician ||
     technician.active ||
     technician.applicationStatus !== 'PENDING' ||
-    !technician.user?.active ||
+    !technician.user ||
+    !isAccountAllowed(technician.user) ||
     technician.user.role !== 'CUSTOMER'
   )
     throw new UserError('ไม่พบใบสมัครที่รออนุมัติ');

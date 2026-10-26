@@ -1,3 +1,4 @@
+import { auditLabel } from '@/lib/audit-label';
 import { requireRole } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
 import { prisma } from '@/lib/prisma';
@@ -16,50 +17,10 @@ export default async function AdminSettings() {
   return (
     <>
       <h1 className="page-title">ตั้งค่าระบบ</h1>
-      <p className="mt-2 text-sm text-muted">ชื่อเว็บ ช่องทางติดต่อ และเงื่อนไขการจอง</p>
+      <p className="mt-2 text-sm text-muted">เงื่อนไขการจองและประวัติการจัดการระบบ</p>
       <div className="panel mt-6 max-w-3xl">
         <ActionForm action={saveSettings} label="บันทึกการตั้งค่า">
-          <div>
-            <label className="label" htmlFor="siteName">
-              ชื่อเว็บ
-            </label>
-            <input
-              id="siteName"
-              name="siteName"
-              className="input"
-              required
-              minLength={2}
-              maxLength={40}
-              defaultValue={setting.siteName}
-            />
-          </div>
           <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-            <div>
-              <label className="label" htmlFor="contactEmail">
-                อีเมลติดต่อ
-              </label>
-              <input
-                id="contactEmail"
-                name="contactEmail"
-                type="email"
-                className="input"
-                defaultValue={setting.contactEmail}
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="contactPhone">
-                เบอร์โทรติดต่อ
-              </label>
-              <input
-                id="contactPhone"
-                name="contactPhone"
-                type="tel"
-                className="input"
-                pattern="0[0-9]{9}|^$"
-                maxLength={10}
-                defaultValue={setting.contactPhone}
-              />
-            </div>
             <div>
               <label className="label" htmlFor="maxAdvanceDays">
                 จองล่วงหน้าได้สูงสุด (วัน)
@@ -125,7 +86,7 @@ export default async function AdminSettings() {
             audit.map((a) => (
               <div key={a.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
                 <span>
-                  {a.actor.name} · {a.action}
+                  {a.actor.name} · {auditLabel(a.action)}
                 </span>
                 <time className="text-xs text-muted">
                   {new Intl.DateTimeFormat('th-TH', {

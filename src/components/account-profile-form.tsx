@@ -152,7 +152,7 @@ export function AccountProfileForm({
         ) : null}
         <div>
           <label htmlFor={`${id}-name`} className="label">
-            ชื่อที่แสดง
+            ชื่อ-นามสกุล
           </label>
           <input
             id={`${id}-name`}

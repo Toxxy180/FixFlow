@@ -7,7 +7,15 @@ import { signOut } from '@/app/auth/actions';
 import type { PublicUser } from '@/lib/types';
 import { mainNavigation } from '@/lib/navigation';
 import { UserAvatar } from './user-avatar';
-export function Header({ user, siteName }: { user: PublicUser | null; siteName: string }) {
+export function Header({
+  user,
+  siteName,
+  restricted = false,
+}: {
+  user: PublicUser | null;
+  siteName: string;
+  restricted?: boolean;
+}) {
   const pathname = usePathname();
   const accountMenu = useRef<HTMLDetailsElement>(null);
   return (
@@ -37,7 +45,13 @@ export function Header({ user, siteName }: { user: PublicUser | null; siteName: 
               className="flex self-stretch gap-7 max-sm:order-3 max-sm:w-full max-sm:gap-6"
               aria-label="เมนูหลัก"
             >
-              {mainNavigation(user?.role).map((item) => (
+              {(restricted
+                ? [
+                    { href: '/', label: 'ค้นหาช่าง' },
+                    { href: '/account-status', label: 'สถานะบัญชี' },
+                  ]
+                : mainNavigation(user?.role)
+              ).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -73,12 +87,12 @@ export function Header({ user, siteName }: { user: PublicUser | null; siteName: 
                   >
                     <p className="truncate px-3 py-2 text-xs text-muted">{user.email}</p>
                     <Link
-                      href="/account"
+                      href={restricted ? '/account-status' : '/account'}
                       className="block rounded-lg px-3 py-2 text-sm hover:bg-soft"
                     >
-                      บัญชีของฉัน
+                      {restricted ? 'สถานะบัญชี' : 'บัญชีของฉัน'}
                     </Link>
-                    {user.role === 'CUSTOMER' ? (
+                    {restricted ? null : user.role === 'CUSTOMER' ? (
                       <Link
                         href="/technician/apply"
                         className="block rounded-lg px-3 py-2 text-sm hover:bg-soft"

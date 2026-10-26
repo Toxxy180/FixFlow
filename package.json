@@ -16,7 +16,7 @@
     "db:seed:demo": "node scripts/seed-demo.mjs",
     "admin:grant": "node --env-file=.env scripts/grant-admin.mjs",
     "check:deploy": "node --env-file=.env scripts/check-deploy.mjs",
-    "test": "tsx --test tests/unit.test.ts",
+    "test": "tsx --test tests/unit.test.ts tests/auth.test.ts",
     "test:db": "tsx --env-file=.env --test tests/booking.integration.test.ts",
     "test:accounts": "tsx --env-file=.env --test tests/user-management.integration.test.ts",
     "test:profile": "tsx --env-file=.env --test tests/account-profile.integration.test.ts",

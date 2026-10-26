@@ -11,7 +11,7 @@ import {
   verifyRegistration,
   sendPasswordReset,
   resetAccountPassword,
-  startGoogleLogin,
+  checkRegistrationEmail,
 } from '@/app/auth/actions';
 import { registrationSchema, passwordPairSchema } from '@/lib/auth-validation';
 import type { AuthActionResult } from '@/lib/types';
@@ -20,14 +20,12 @@ type Mode = 'login' | 'register' | 'forgot';
 export function LoginForm({
   demo = false,
   configured,
-  googleEnabled = false,
   mode = 'login',
   notice = '',
   initialStep = 'FORM',
 }: {
   demo?: boolean;
   configured: boolean;
-  googleEnabled?: boolean;
   mode?: Mode;
   notice?: string;
   initialStep?: 'FORM' | 'RESET';
@@ -37,6 +35,10 @@ export function LoginForm({
   const [step, setStep] = useState<'FORM' | 'VERIFY' | 'EMAIL_SENT' | 'RESET'>(initialStep);
   const [signupType, setSignupType] = useState<'CUSTOMER' | 'TECHNICIAN'>('CUSTOMER');
   const [email, setEmail] = useState('');
+  const [emailCheck, setEmailCheck] = useState<{ email: string; message: string }>({
+    email: '',
+    message: '',
+  });
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -62,6 +64,8 @@ export function LoginForm({
               : 'เข้าสู่ระบบ';
   function handle(result: AuthActionResult) {
     if (result.error) setError(result.error);
+    if (result.message) setMessage(result.message);
+    if (result.retryAfter) setCooldown(result.retryAfter);
     if (result.step) {
       setStep(result.step);
       setToken('');
@@ -80,14 +84,14 @@ export function LoginForm({
         {step === 'EMAIL_SENT'
           ? `หากมีบัญชี ${email} ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้ กรุณาเปิดอีเมลแล้วคลิกลิงก์ในเบราว์เซอร์เดียวกับที่ขอ`
           : step === 'VERIFY'
-            ? `กรอกรหัสที่ส่งไปยัง ${email} เพื่อยืนยันบัญชี`
+            ? `ยืนยันบัญชี ${email} ด้วยรหัสล่าสุดที่ได้รับ หากยังไม่ได้รับให้กดส่งรหัสอีกครั้ง`
             : step === 'RESET'
               ? 'ตั้งรหัสผ่านสำหรับเข้าสู่ระบบครั้งต่อไป'
               : mode === 'register'
                 ? 'เลือกประเภทบัญชี กรอกข้อมูล และยืนยันอีเมลด้วย OTP'
                 : mode === 'forgot'
                   ? 'กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่ หรือเพิ่มรหัสผ่านให้บัญชีเดิม'
-                  : 'ใช้อีเมลและรหัสผ่าน หรือเข้าสู่ระบบด้วย Google'}
+                  : 'ใช้อีเมลและรหัสผ่าน ยืนยัน OTP เฉพาะตอนสมัครครั้งแรก'}
       </p>
       {notice && !error ? (
         <p role="status" className="mt-4 rounded-lg bg-blue-50 p-3 text-sm text-primary">
@@ -178,20 +182,33 @@ export function LoginForm({
                   ระหว่างรอยังจองบริการได้
                 </p>
               ) : null}
-              <div>
-                <label htmlFor="signup-name" className="label">
-                  ชื่อที่แสดง
-                </label>
-                <input
-                  id="signup-name"
-                  name="name"
-                  className="input"
-                  autoComplete="name"
-                  minLength={2}
-                  maxLength={100}
-                  required
-                  placeholder="ชื่อของคุณ"
-                />
+              <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+                <div>
+                  <label htmlFor="firstName" className="label">
+                    ชื่อจริง
+                  </label>
+                  <input
+                    id="firstName"
+                    name="firstName"
+                    className="input"
+                    autoComplete="given-name"
+                    maxLength={49}
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="lastName" className="label">
+                    นามสกุล
+                  </label>
+                  <input
+                    id="lastName"
+                    name="lastName"
+                    className="input"
+                    autoComplete="family-name"
+                    maxLength={50}
+                    required
+                  />
+                </div>
               </div>
             </>
           ) : null}
@@ -208,10 +225,40 @@ export function LoginForm({
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value.trim().toLowerCase())}
+                onBlur={async () => {
+                  if (mode !== 'register' || !email) return;
+                  const checked = email;
+                  try {
+                    const result = await checkRegistrationEmail(checked);
+                    setEmailCheck({
+                      email: checked,
+                      message:
+                        result.error ||
+                        (result.status === 'CONFIRMED'
+                          ? 'อีเมลนี้มีบัญชีแล้ว กรุณาเข้าสู่ระบบ หรือกดลืมรหัสผ่าน'
+                          : result.status === 'UNCONFIRMED'
+                            ? 'อีเมลนี้สมัครไว้แล้วแต่ยังไม่ยืนยัน กดสมัครเพื่อส่ง OTP ใหม่ โดยใช้ข้อมูลบัญชีเดิม'
+                            : result.status === 'AVAILABLE'
+                              ? 'อีเมลนี้ใช้สมัครได้'
+                              : ''),
+                    });
+                  } catch {
+                    setEmailCheck({
+                      email: checked,
+                      message: 'ยังตรวจอีเมลไม่ได้ ระบบจะตรวจอีกครั้งตอนสมัคร',
+                    });
+                  }
+                }}
+                aria-describedby={mode === 'register' ? 'email-check' : undefined}
                 maxLength={254}
                 required
                 placeholder="you@example.com"
               />
+              {mode === 'register' && emailCheck.email === email ? (
+                <p id="email-check" role="status" className="mt-2 text-xs text-muted">
+                  {emailCheck.message}
+                </p>
+              ) : null}
             </div>
           ) : null}
           {(step === 'FORM' && mode !== 'forgot') || step === 'RESET' ? (
@@ -324,13 +371,14 @@ export function LoginForm({
                   const result = await (step === 'EMAIL_SENT'
                     ? sendPasswordReset(email)
                     : resendSignupCode(email));
+                  if (result.retryAfter) setCooldown(result.retryAfter);
                   if (result.error) setError(result.error);
                   else {
                     setCooldown(60);
                     setMessage(
                       step === 'EMAIL_SENT'
                         ? 'หากมีบัญชีที่ใช้อีเมลนี้ ระบบจะส่งลิงก์ใหม่ให้ กรุณาใช้ลิงก์จากอีเมลล่าสุด'
-                        : 'หากอีเมลตรงกับบัญชีที่รอยืนยัน ระบบจะส่งรหัสใหม่ให้แล้ว',
+                        : 'ส่งรหัสยืนยันใหม่แล้ว กรุณาใช้รหัสจากอีเมลล่าสุด',
                     );
                   }
                 } catch {
@@ -372,43 +420,6 @@ export function LoginForm({
               ลืมรหัสผ่าน / ตั้งรหัสผ่านครั้งแรก
             </Link>
           ) : null}
-          <div className="my-5 flex items-center gap-3 text-xs text-muted">
-            <span className="h-px flex-1 bg-line" />
-            หรือ
-            <span className="h-px flex-1 bg-line" />
-          </div>
-          <button
-            type="button"
-            className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-line bg-white px-4 py-3 text-sm font-semibold hover:bg-soft disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={pending || !ready || !configured || !googleEnabled}
-            onClick={() => {
-              setError('');
-              start(async () => {
-                try {
-                  const result = await startGoogleLogin(mode === 'register' ? signupType : 'LOGIN');
-                  if (result.error) setError(result.error);
-                  else if (result.redirectTo) window.location.assign(result.redirectTo);
-                } catch {
-                  setError('เชื่อมต่อ Google ไม่สำเร็จ กรุณาลองใหม่');
-                }
-              });
-            }}
-          >
-            <span aria-hidden="true" className="text-lg font-bold text-primary">
-              G
-            </span>
-            {mode === 'register' ? 'สมัครด้วย Google' : 'เข้าสู่ระบบด้วย Google'}
-          </button>
-          {!googleEnabled ? (
-            <p className="mt-2 text-center text-xs text-muted">
-              Google ยังไม่เปิดให้ใช้งาน สามารถใช้อีเมลได้ตามปกติ
-            </p>
-          ) : null}
-          {mode === 'register' ? (
-            <p className="mt-3 text-xs leading-relaxed text-muted">
-              Google ใช้การยืนยันบัญชีจาก Google ผู้สมัครช่างยังต้องผ่านการอนุมัติเช่นเดียวกัน
-            </p>
-          ) : null}
         </>
       ) : null}
       <p className="mt-6 border-t border-line pt-5 text-center text-sm text-muted">
@@ -440,7 +451,7 @@ export function LoginForm({
               <button
                 key={role}
                 type="button"
-                disabled={pending}
+                disabled={pending || !ready}
                 className="rounded-lg border border-line bg-white px-2 py-2 text-sm text-primary"
                 onClick={() =>
                   start(async () => {

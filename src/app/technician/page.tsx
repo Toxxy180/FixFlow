@@ -17,7 +17,10 @@ export default async function TechnicianDashboard() {
   const [bookings, pending, working, completed] = await Promise.all([
     prisma.booking.findMany({
       where: { technicianId: technician.id },
-      include: { technician: { select: { name: true } } },
+      include: {
+        technician: { select: { name: true } },
+        customer: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 50,
     }),

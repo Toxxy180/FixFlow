@@ -7,13 +7,20 @@ export type BookingRow = {
   id: string;
   reference: string;
   customerName: string;
+  customer: { id: string; name: string };
   technician: { name: string };
   date: string;
   time: string;
   status: JobStatus;
   totalAmount: number;
 };
-export function BookingTable({ bookings }: { bookings: BookingRow[] }) {
+export function BookingTable({
+  bookings,
+  admin = false,
+}: {
+  bookings: BookingRow[];
+  admin?: boolean;
+}) {
   return (
     <div className="overflow-hidden rounded-lg border border-line">
       <div className={`overflow-x-auto ${!bookings.length ? 'max-sm:hidden' : ''}`}>
@@ -38,7 +45,18 @@ export function BookingTable({ bookings }: { bookings: BookingRow[] }) {
                     {b.reference}
                   </Link>
                 </td>
-                <td className="max-w-40 truncate px-4 py-4">{b.customerName}</td>
+                <td className="max-w-40 truncate px-4 py-4">
+                  {admin ? (
+                    <Link
+                      href={`/admin/users/${b.customer.id}`}
+                      className="text-primary hover:underline"
+                    >
+                      {b.customer.name}
+                    </Link>
+                  ) : (
+                    b.customer.name
+                  )}
+                </td>
                 <td className="px-4 py-4">{b.technician.name}</td>
                 <td className="whitespace-nowrap px-4 py-4">
                   <p>{dateLabel(b.date)}</p>

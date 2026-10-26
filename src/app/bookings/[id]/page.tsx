@@ -69,7 +69,22 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
                 </span>
               </p>
               <p className="break-words">
-                ผู้จอง: {booking.customerName}
+                ผู้จอง:{' '}
+                {user.role === 'ADMIN' ? (
+                  <Link
+                    className="font-semibold text-primary hover:underline"
+                    href={`/admin/users/${booking.customer.id}`}
+                  >
+                    {booking.customer.name}
+                  </Link>
+                ) : (
+                  booking.customer.name
+                )}
+                {booking.customerName !== booking.customer.name ? (
+                  <span className="mt-1 block text-xs text-muted">
+                    ชื่อที่บันทึกตอนจอง: {booking.customerName}
+                  </span>
+                ) : null}
                 <br />
                 <span className="text-muted">โทร {booking.phone}</span>
               </p>

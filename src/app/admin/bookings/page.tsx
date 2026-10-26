@@ -23,6 +23,8 @@ export default async function AdminBookings({
           OR: [
             { reference: { contains: q, mode: 'insensitive' } },
             { customerName: { contains: q, mode: 'insensitive' } },
+            { customer: { name: { contains: q, mode: 'insensitive' } } },
+            { customer: { email: { contains: q, mode: 'insensitive' } } },
           ],
         }
       : {}),
@@ -30,7 +32,10 @@ export default async function AdminBookings({
   const [bookings, total] = await Promise.all([
     prisma.booking.findMany({
       where,
-      include: { technician: { select: { name: true } } },
+      include: {
+        technician: { select: { name: true } },
+        customer: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 20,
       skip: (page - 1) * 20,
@@ -47,7 +52,7 @@ export default async function AdminBookings({
           aria-label="ค้นหารายการจอง"
           className="input max-w-xs"
           defaultValue={q}
-          placeholder="เลขที่งาน หรือชื่อลูกค้า"
+          placeholder="เลขที่งาน ชื่อลูกค้า หรืออีเมล"
           maxLength={100}
         />
         <select
@@ -67,7 +72,7 @@ export default async function AdminBookings({
       </form>
       <section className="panel">
         <p className="mb-4 text-sm text-muted">พบ {total} รายการ</p>
-        <BookingTable bookings={bookings} />
+        <BookingTable bookings={bookings} admin />
         <div className="mt-5 flex justify-between text-sm">
           {page > 1 ? (
             <Link

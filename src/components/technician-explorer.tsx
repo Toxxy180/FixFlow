@@ -242,11 +242,14 @@ export function TechnicianExplorer({
                       เริ่มต้น{' '}
                       <strong className="ml-1 text-lg text-ink">฿{currency(t.price)}</strong>
                     </p>
-                    {user?.role === 'TECHNICIAN' ? (
-                      <Link href="/technician" className="btn min-h-10 text-sm">
-                        งานของฉัน
-                      </Link>
-                    ) : !settings.bookingEnabled ? (
+                    <Link
+                      href={`/technicians/${t.id}`}
+                      className="text-sm font-semibold text-primary hover:underline"
+                      aria-label={`ดูรายละเอียด${t.name}`}
+                    >
+                      ดูรายละเอียด
+                    </Link>
+                    {user && user.role !== 'CUSTOMER' ? null : !settings.bookingEnabled ? (
                       <span className="text-sm text-muted">พักรับการจอง</span>
                     ) : !user ? (
                       <Link
@@ -290,7 +293,7 @@ export function TechnicianExplorer({
           )}
         </div>
       </section>
-      {selected && user && user.role !== 'TECHNICIAN' ? (
+      {selected && user && user.role === 'CUSTOMER' ? (
         <BookingDialog
           technician={selected}
           services={services.filter((s) => s.categoryId === selected.category)}

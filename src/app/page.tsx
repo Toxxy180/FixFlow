@@ -1,3 +1,4 @@
+import { activeAccountWhere } from '@/lib/account-status';
 import { prisma } from '@/lib/prisma';
 import { TechnicianExplorer } from '@/components/technician-explorer';
 import { bangkokDate } from '@/lib/constants';
@@ -10,7 +11,7 @@ export default async function Home() {
       where: {
         active: true,
         categoryModel: { active: true, services: { some: { active: true } } },
-        OR: [{ userId: null }, { user: { active: true } }],
+        OR: [{ userId: null }, { user: activeAccountWhere() }],
       },
       include: {
         categoryModel: true,

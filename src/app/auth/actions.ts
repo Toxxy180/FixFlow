@@ -18,7 +18,14 @@ import {
   passwordPairSchema,
 } from '@/lib/auth-validation';
 import { destinationAfterAuth, syncVerifiedProfile } from '@/lib/auth-profile';
-import { googleAuthEnabled } from '@/lib/auth-providers';
+import { isAccountAllowed } from '@/lib/account-status';
+import {
+  createRegistration,
+  resendConfirmation,
+  passwordLogin,
+  duplicateEmailMessage,
+  type EmailStatus,
+} from '@/lib/signup-service';
 import { consumeRecoveryTicket } from '@/lib/auth-recovery';
 
 async function throttle(kind: string, email: string, limit: number, seconds: number) {
@@ -39,10 +46,7 @@ async function throttle(kind: string, email: string, limit: number, seconds: num
 
 async function signedIn(user: User): Promise<AuthActionResult> {
   const profile = await syncVerifiedProfile(user);
-  if (!profile.active) {
-    await (await createClient()).auth.signOut();
-    return { error: 'บัญชีนี้ถูกระงับ กรุณาติดต่อผู้ดูแลระบบ' };
-  }
+  if (!isAccountAllowed(profile)) return { success: true, redirectTo: '/account-status' };
   revalidatePath('/', 'layout');
   return {
     success: true,
@@ -62,18 +66,35 @@ export async function loginWithPassword(form: FormData): Promise<AuthActionResul
       !(await throttle('login-ip', '', 40, 900))
     )
       return { error: 'เข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่' };
-    const { data, error } = await (
-      await createClient()
-    ).auth.signInWithPassword({ email: email.data, password });
-    if (error?.code === 'email_not_confirmed')
-      return {
-        step: 'VERIFY',
-        error: 'กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ สามารถขอรหัสใหม่ได้ด้านล่าง',
-      };
-    if (error || !data.user?.email_confirmed_at) return { error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' };
-    return await signedIn(data.user);
+    return await passwordLogin(email.data, password, (await createClient()).auth, signedIn, () =>
+      resendSignupCode(email.data),
+    );
   } catch {
     return { error: 'เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่' };
+  }
+}
+
+async function emailStatus(email: string): Promise<EmailStatus> {
+  const rows = await prisma.$queryRaw<
+    { status: EmailStatus }[]
+  >`SELECT public.fixflow_email_status(${email}::text) AS status`;
+  const status = rows[0]?.status;
+  if (!['AVAILABLE', 'UNCONFIRMED', 'CONFIRMED'].includes(status))
+    throw new Error('Email lookup unavailable');
+  return status;
+}
+
+export async function checkRegistrationEmail(
+  input: string,
+): Promise<{ status?: EmailStatus; error?: string }> {
+  const email = emailSchema.safeParse(input.trim());
+  if (!email.success || !hasSupabase()) return {};
+  try {
+    if (!(await throttle('email-check-ip', '', 30, 300)))
+      return { error: 'ตรวจสอบบ่อยเกินไป กรุณารอสักครู่' };
+    return { status: await emailStatus(email.data) };
+  } catch {
+    return { error: 'ตรวจสอบอีเมลยังไม่ได้ กรุณาลองใหม่' };
   }
 }
 
@@ -85,27 +106,20 @@ export async function registerAccount(form: FormData): Promise<AuthActionResult>
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   if (!hasSupabase()) return { error: 'ระบบสมัครสมาชิกยังไม่พร้อม กรุณาติดต่อผู้ดูแลระบบ' };
   try {
+    if (!(await throttle('signup-check-ip', '', 30, 300)))
+      return { error: 'สมัครบ่อยเกินไป กรุณารอสักครู่' };
+    const status = await emailStatus(parsed.data.email);
+    if (status === 'CONFIRMED') return { error: duplicateEmailMessage };
     if (
       !(await throttle('send', parsed.data.email, 1, 60)) ||
       !(await throttle('send-ip', '', 10, 900))
     )
-      return { error: 'ขอรหัสบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่' };
-    const { name, email, password, signupType } = parsed.data;
-    const client = await createClient();
-    const { data, error } = await client.auth.signUp({
-      email,
-      password,
-      options: { data: { display_name: name, signup_type: signupType } },
-    });
-    if (error)
       return {
-        error: 'สมัครไม่สำเร็จ กรุณาตรวจอีเมลและรหัสผ่าน หรือลองเข้าสู่ระบบหากเคยสมัครแล้ว',
+        step: status === 'UNCONFIRMED' ? 'VERIFY' : undefined,
+        error: 'กรุณารอ 60 วินาทีก่อนขอรหัสใหม่ และใช้รหัสล่าสุดที่ได้รับ',
+        retryAfter: 60,
       };
-    if (data.session) {
-      await client.auth.signOut();
-      return { error: 'ระบบยืนยันอีเมลยังไม่ได้เปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ' };
-    }
-    return { success: true, step: 'VERIFY' };
+    return await createRegistration(parsed.data, status, (await createClient()).auth);
   } catch {
     return { error: 'สมัครไม่สำเร็จ กรุณาลองใหม่' };
   }
@@ -116,11 +130,12 @@ export async function resendSignupCode(input: string): Promise<AuthActionResult>
   if (!email.success || !hasSupabase()) return { error: 'กรุณาตรวจสอบอีเมล' };
   try {
     if (!(await throttle('send', email.data, 1, 60)) || !(await throttle('send-ip', '', 10, 900)))
-      return { error: 'ขอรหัสบ่อยเกินไป กรุณารอสักครู่' };
-    const { error } = await (
-      await createClient()
-    ).auth.resend({ type: 'signup', email: email.data });
-    return error ? { error: 'ส่งรหัสไม่สำเร็จ กรุณาลองใหม่' } : { success: true };
+      return { error: 'กรุณารอ 60 วินาทีก่อนขอรหัสใหม่ และใช้รหัสล่าสุดที่ได้รับ', retryAfter: 60 };
+    return await resendConfirmation(
+      email.data,
+      await emailStatus(email.data),
+      (await createClient()).auth,
+    );
   } catch {
     return { error: 'เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่' };
   }
@@ -183,49 +198,13 @@ export async function resetAccountPassword(form: FormData): Promise<AuthActionRe
   }
 }
 
-export async function startGoogleLogin(kind: string): Promise<AuthActionResult> {
-  if (!['LOGIN', 'CUSTOMER', 'TECHNICIAN'].includes(kind) || !hasSupabase())
-    return { error: 'คำขอเข้าสู่ระบบไม่ถูกต้อง' };
-  try {
-    if (!(await throttle('google-ip', '', 30, 900)))
-      return { error: 'เข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่' };
-    if (!(await googleAuthEnabled()))
-      return { error: 'การเข้าสู่ระบบด้วย Google ยังไม่เปิดให้ใช้งาน กรุณาใช้อีเมลและรหัสผ่าน' };
-    const jar = await cookies();
-    jar.set('fixflow-signup-kind', kind, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 600,
-    });
-    const { data, error } = await (
-      await createClient()
-    ).auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${applicationOrigin()}/auth/callback`,
-        skipBrowserRedirect: true,
-        queryParams: { prompt: 'select_account' },
-      },
-    });
-    if (error || !data.url) {
-      jar.delete('fixflow-signup-kind');
-      return { error: 'เริ่มเข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่' };
-    }
-    return { success: true, redirectTo: data.url };
-  } catch {
-    return { error: 'เชื่อมต่อ Google ไม่สำเร็จ กรุณาลองใหม่' };
-  }
-}
-
 export async function demoLogin(role: string): Promise<ActionResult> {
   if (!isDemoMode() || !Object.hasOwn(demoIds, role)) return { error: 'โหมดสาธิตไม่เปิดใช้งาน' };
   const host = (await headers()).get('host')?.split(':')[0];
   if (!host || !['localhost', '127.0.0.1'].includes(host))
     return { error: 'โหมดสาธิตใช้ได้เฉพาะในเครื่อง' };
-  if (!(await prisma.appUser.findUnique({ where: { id: demoIds[role] } })))
-    return { error: 'กรุณารัน npm run db:seed:demo ก่อน' };
+  const account = await prisma.appUser.findUnique({ where: { id: demoIds[role] } });
+  if (!account) return { error: 'กรุณารัน npm run db:seed:demo ก่อน' };
   (await cookies()).set('fixflow-demo', role, {
     httpOnly: true,
     sameSite: 'lax',
@@ -235,7 +214,9 @@ export async function demoLogin(role: string): Promise<ActionResult> {
   revalidatePath('/', 'layout');
   return {
     success: true,
-    redirectTo: loginDestination(role as 'ADMIN' | 'TECHNICIAN' | 'CUSTOMER'),
+    redirectTo: isAccountAllowed(account)
+      ? loginDestination(role as 'ADMIN' | 'TECHNICIAN' | 'CUSTOMER')
+      : '/account-status',
   };
 }
 

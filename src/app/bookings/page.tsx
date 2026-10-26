@@ -13,6 +13,7 @@ export default async function Bookings({
 }) {
   const user = await requireUser();
   if (user.role === 'TECHNICIAN') redirect('/technician');
+  if (user.role === 'ADMIN') redirect('/admin/bookings');
   const params = await searchParams;
   const page = Math.min(1000, Math.max(1, Number.parseInt(params.page || '1') || 1));
   const selectedStatus = Object.values(JobStatus).includes(params.status as JobStatus)

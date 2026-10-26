@@ -1,3 +1,4 @@
+import { isAccountAllowed } from '@/lib/account-status';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { validImagePath } from './images';
@@ -23,7 +24,7 @@ export async function saveAccountProfile(
   if (avatar.action === 'REPLACE' && !validImagePath(avatar.path, ownerId))
     throw new UserError('รูปโปรไฟล์ไม่ถูกต้อง');
   const user = await tx.appUser.findUnique({ where: { id: ownerId } });
-  if (!user?.active) throw new UserError('บัญชีนี้ไม่พร้อมใช้งาน');
+  if (!user || !isAccountAllowed(user)) throw new UserError('บัญชีนี้ไม่พร้อมใช้งาน');
   const obsoletePaths: string[] = [];
   if (avatar.action !== 'KEEP') {
     const previous = await tx.userImage.findMany({ where: { ownerId, kind: 'AVATAR' } });

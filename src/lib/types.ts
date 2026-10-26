@@ -18,6 +18,7 @@ export type PublicTechnician = {
 };
 export type PublicService = { id: string; name: string; categoryId: string; price: number };
 export const bookingInclude = {
+  customer: { select: { id: true, name: true } },
   technician: true,
   district: true,
   payment: true,
@@ -32,4 +33,8 @@ export type ActionResult = {
   reference?: string;
   redirectTo?: string;
 };
-export type AuthActionResult = ActionResult & { step?: 'VERIFY' | 'EMAIL_SENT' | 'RESET' };
+export type AuthActionResult = ActionResult & {
+  step?: 'VERIFY' | 'EMAIL_SENT' | 'RESET';
+  message?: string;
+  retryAfter?: number;
+};

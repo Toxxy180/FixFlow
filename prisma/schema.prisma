@@ -44,6 +44,8 @@ model AppUser {
   avatarPath String?
   role       Role     @default(CUSTOMER)
   active     Boolean  @default(true)
+  suspendedUntil DateTime?
+  suspensionReason String @default("")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   technician Technician?

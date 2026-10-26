@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
 import { hasSupabase, isDemoMode, safeNext } from './config';
 import { syncVerifiedProfile } from './auth-profile';
+import { isAccountAllowed } from './account-status';
 
 export const demoIds: Record<string, string> = {
   CUSTOMER: '00000000-0000-4000-8000-000000000001',
@@ -23,22 +24,28 @@ export const getAuthIdentity = cache(async () => {
   return !error && user?.email && user.email_confirmed_at ? user : null;
 });
 
-export const getCurrentUser = cache(async () => {
+export const getAccount = cache(async () => {
   if (isDemoMode()) {
     const role = (await cookies()).get('fixflow-demo')?.value;
     if (!role || !Object.hasOwn(demoIds, role)) return null;
-    return prisma.appUser.findFirst({ where: { id: demoIds[role], active: true } });
+    return prisma.appUser.findUnique({ where: { id: demoIds[role] } });
   }
   if (!hasSupabase()) return null;
   const user = await getAuthIdentity();
   if (!user) return null;
   const profile = await syncVerifiedProfile(user);
-  return profile.active ? profile : null;
+  return profile;
+});
+
+export const getCurrentUser = cache(async () => {
+  const profile = await getAccount();
+  return isAccountAllowed(profile) ? profile : null;
 });
 
 export async function requireUser(next = '/bookings') {
-  const user = await getCurrentUser();
+  const user = await getAccount();
   if (!user) redirect(`/login?next=${encodeURIComponent(safeNext(next))}`);
+  if (!isAccountAllowed(user)) redirect('/account-status');
   return user;
 }
 export async function requireRole(role: Role, next: string) {

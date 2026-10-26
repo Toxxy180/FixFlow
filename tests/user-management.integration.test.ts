@@ -4,9 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../src/lib/prisma';
 import { updateManagedUser } from '../src/lib/user-management';
+import { accountStatus, activeAccountWhere } from '../src/lib/account-status';
 
-test('account updates preserve applications and photos, pause technicians and require approval', async () => {
+test('account status controls preserve roles, applications, photos and jobs; expiry restores access', async () => {
   const id = randomUUID();
+  const adminId = randomUUID();
   const actor = { id: randomUUID(), role: 'ADMIN' as const, active: true };
   const rollback = new Error('ROLLBACK_TEST_FIXTURE');
   try {
@@ -14,119 +16,158 @@ test('account updates preserve applications and photos, pause technicians and re
       prisma.$transaction(
         async (tx) => {
           const category = await tx.serviceCategory.findFirstOrThrow();
-          const portfolioPath = `${id}/${randomUUID()}.webp`;
+          const email = `${id}@test.example`;
+          await tx.appUser.create({ data: { id, email, name: 'บัญชีทดสอบแบบ rollback' } });
           await tx.appUser.create({
-            data: { id, email: `${id}@test.example`, name: 'ทดสอบบัญชีแบบ rollback' },
-          });
-          const technician = await tx.technician.create({
             data: {
-              name: 'ใบสมัครทดสอบแบบ rollback',
+              id: adminId,
+              email: `${adminId}@test.example`,
+              name: 'Admin ทดสอบ',
+              role: 'ADMIN',
+            },
+          });
+          const path = `${id}/${randomUUID()}.webp`;
+          const tech = await tx.technician.create({
+            data: {
+              name: 'ช่างทดสอบ rollback',
               initials: 'ทด',
               category: category.id,
               district: 'พระนคร',
-              description: 'ข้อมูลทดสอบที่ไม่บันทึกถาวร',
+              description: 'ข้อมูลจำลอง',
               price: 500,
               active: false,
               userId: id,
               applicationStatus: 'PENDING',
-              portfolioPaths: [portfolioPath],
+              portfolioPaths: [path],
             },
           });
-          const application = () =>
-            tx.technician.findUniqueOrThrow({ where: { id: technician.id } });
-          const unchangedCustomer = { id, role: 'CUSTOMER' as const, active: true };
-          for (const status of ['NONE', 'REJECTED', 'PENDING'] as const) {
-            await tx.technician.update({
-              where: { id: technician.id },
-              data: { applicationStatus: status },
-            });
-            await updateManagedUser(tx, actor, unchangedCustomer);
-            assert.equal(
-              (await application()).userId,
-              id,
-              'saving a customer must retain their application',
-            );
-            assert.equal((await application()).applicationStatus, status);
-            assert.deepEqual((await application()).portfolioPaths, [portfolioPath]);
-          }
-          await assert.rejects(
-            updateManagedUser(tx, actor, { ...unchangedCustomer, role: 'TECHNICIAN' }),
-            /อนุมัติใบสมัคร/,
+          await updateManagedUser(tx, actor, { id, status: 'DISABLED', reason: 'ทดสอบปิดบัญชี' });
+          assert.equal((await tx.appUser.findUniqueOrThrow({ where: { id } })).role, 'CUSTOMER');
+          await updateManagedUser(tx, actor, { id, status: 'ACTIVE' });
+          assert.equal(
+            (await tx.technician.findUniqueOrThrow({ where: { id: tech.id } })).active,
+            false,
+            'activation never approves a pending application',
           );
-          await updateManagedUser(tx, actor, { ...unchangedCustomer, active: false });
-          await updateManagedUser(tx, actor, unchangedCustomer);
-          assert.equal((await application()).applicationStatus, 'PENDING');
-          assert.equal((await application()).userId, id);
+          await assert.rejects(
+            updateManagedUser(tx, actor, { id, status: 'ACTIVE', role: 'ADMIN' } as never),
+          );
+          await assert.rejects(
+            updateManagedUser(tx, actor, {
+              id: adminId,
+              status: 'DISABLED',
+              reason: 'ทดสอบป้องกัน Admin',
+            }),
+            /Admin/,
+          );
+          await assert.rejects(
+            updateManagedUser(tx, actor, { id: actor.id, status: 'DISABLED', reason: 'ทดสอบ' }),
+            /ตัวเอง/,
+          );
+          await assert.rejects(
+            updateManagedUser(tx, { ...actor, role: 'CUSTOMER' }, { id, status: 'ACTIVE' }),
+            /ไม่มีสิทธิ์/,
+          );
+          await assert.rejects(
+            updateManagedUser(
+              tx,
+              { ...actor, suspendedUntil: new Date('2099-01-01') },
+              { id, status: 'ACTIVE' },
+            ),
+            /ไม่มีสิทธิ์/,
+          );
+          await assert.rejects(
+            updateManagedUser(tx, actor, {
+              id,
+              status: 'SUSPENDED',
+              until: '2000-01-01T09:00',
+              reason: 'ทดสอบ',
+            }),
+            /อนาคต/,
+          );
           await tx.appUser.update({ where: { id }, data: { role: 'TECHNICIAN' } });
           await tx.technician.update({
-            where: { id: technician.id },
+            where: { id: tech.id },
             data: { applicationStatus: 'APPROVED', active: true },
           });
-          const approvedTechnician = { id, role: 'TECHNICIAN' as const, active: true };
           const service = await tx.service.findFirstOrThrow();
           const district = await tx.district.findFirstOrThrow();
           const job = await tx.booking.create({
             data: {
               reference: `QA-${randomUUID()}`,
               customerId: id,
-              customerName: 'ทดสอบแบบ rollback',
+              customerName: 'ประวัติเดิม',
               phone: '0800000000',
-              address: 'ที่อยู่จำลองสำหรับทดสอบ',
-              districtId: district.id,
+              address: 'ที่อยู่จำลอง',
               details: '',
+              districtId: district.id,
               date: '2099-01-01',
               time: '09:00',
               serviceId: service.id,
               serviceName: service.name,
               price: 500,
               totalAmount: 500,
-              technicianId: technician.id,
+              technicianId: tech.id,
             },
           });
-          await assert.rejects(
-            updateManagedUser(tx, actor, { ...approvedTechnician, active: false }),
-            /ช่างมีงานค้าง/,
-          );
-          await assert.rejects(updateManagedUser(tx, actor, unchangedCustomer), /ผู้ใช้มีงานค้าง/);
-          assert.equal((await application()).active, true);
-          await tx.booking.update({ where: { id: job.id }, data: { status: 'CANCELLED' } });
-          await updateManagedUser(tx, actor, { ...approvedTechnician, active: false });
-          assert.equal((await application()).active, false);
-          assert.equal(
-            (await application()).userId,
+          await updateManagedUser(tx, actor, {
             id,
-            'suspension must retain technician ownership',
-          );
-          await updateManagedUser(tx, actor, approvedTechnician);
+            status: 'SUSPENDED',
+            until: '2099-01-01T09:00',
+            reason: 'ทดสอบพักบัญชี',
+          });
+          const suspended = await tx.appUser.findUniqueOrThrow({ where: { id } });
+          assert.equal(suspended.suspendedUntil?.toISOString(), '2099-01-01T02:00:00.000Z');
+          assert.equal(accountStatus(suspended), 'SUSPENDED');
+          assert.equal(await tx.appUser.count({ where: { id, ...activeAccountWhere() } }), 0);
           assert.equal(
-            (await application()).active,
-            false,
-            'reactivation must not reopen work automatically',
+            await tx.technician.count({
+              where: { id: tech.id, active: true, user: activeAccountWhere() },
+            }),
+            0,
           );
-          assert.equal((await application()).applicationStatus, 'APPROVED');
-          await updateManagedUser(tx, actor, unchangedCustomer);
+          const expires = new Date('2099-01-01T02:00:00.000Z');
+          assert.equal(accountStatus(suspended, expires), 'ACTIVE');
           assert.equal(
-            (await application()).userId,
-            id,
-            'role changes must preserve historical ownership',
+            await tx.technician.count({
+              where: { id: tech.id, active: true, user: activeAccountWhere(expires) },
+            }),
+            1,
           );
-          assert.deepEqual((await application()).portfolioPaths, [portfolioPath]);
-          await assert.rejects(
-            updateManagedUser(tx, { ...actor, role: 'CUSTOMER' }, approvedTechnician),
-            /ไม่มีสิทธิ์/,
+          assert.equal(
+            (await tx.booking.findUniqueOrThrow({ where: { id: job.id } })).status,
+            'PENDING',
           );
-          await assert.rejects(
-            updateManagedUser(tx, { ...actor, id }, unchangedCustomer),
-            /ตัวเอง/,
-          );
+          await updateManagedUser(tx, actor, { id, status: 'DISABLED', reason: 'ทดสอบปิด' });
+          await updateManagedUser(tx, actor, { id, status: 'ACTIVE' });
+          const restored = await tx.appUser.findUniqueOrThrow({ where: { id } });
+          assert.equal(restored.role, 'TECHNICIAN');
+          assert.equal(restored.suspendedUntil, null);
+          assert.equal(restored.suspensionReason, '');
+          const preserved = await tx.technician.findUniqueOrThrow({ where: { id: tech.id } });
+          assert.equal(preserved.applicationStatus, 'APPROVED');
+          assert.deepEqual(preserved.portfolioPaths, [path]);
+          assert.equal(preserved.userId, id);
+          const existing = await tx.$queryRaw<
+            { status: string }[]
+          >`SELECT public.fixflow_email_status(${`  ${email.toUpperCase()}  `}::text) AS status`;
+          assert.equal(existing[0].status, 'CONFIRMED');
+          const available = await tx.$queryRaw<
+            { status: string }[]
+          >`SELECT public.fixflow_email_status(${`${randomUUID()}@test.example`}::text) AS status`;
+          assert.equal(available[0].status, 'AVAILABLE');
+          const privileges = await tx.$queryRaw<
+            { role: string; allowed: boolean }[]
+          >`SELECT rolname AS role, has_function_privilege(oid, 'public.fixflow_email_status(text)', 'EXECUTE') AS allowed FROM pg_roles WHERE rolname IN ('anon','authenticated','fixflow_app')`;
+          for (const role of privileges)
+            assert.equal(role.allowed, role.role === 'fixflow_app', role.role);
           throw rollback;
         },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30000 },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 45000 },
       ),
-      (error: unknown) => error === rollback,
+      (error) => error === rollback,
     );
-    assert.equal(await prisma.appUser.findUnique({ where: { id } }), null);
-    assert.equal(await prisma.technician.count({ where: { userId: id } }), 0);
+    assert.equal(await prisma.appUser.count({ where: { id: { in: [id, adminId] } } }), 0);
   } finally {
     await prisma.$disconnect();
   }

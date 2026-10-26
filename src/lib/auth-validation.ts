@@ -23,7 +23,8 @@ export const passwordPairSchema = z
     path: ['confirmPassword'],
   });
 export const registrationSchema = passwordPairSchema.safeExtend({
-  name: z.string().trim().min(2, 'ชื่อควรยาวอย่างน้อย 2 ตัวอักษร').max(100),
+  firstName: z.string().trim().min(1, 'กรุณากรอกชื่อจริง').max(49),
+  lastName: z.string().trim().min(1, 'กรุณากรอกนามสกุล').max(50),
   email: emailSchema,
   signupType: signupTypeSchema,
 });

@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoaderCircle } from 'lucide-react';
 import type { ActionResult } from '@/lib/types';
@@ -22,10 +22,13 @@ export function ActionForm({
   const [message, setMessage] = useState('');
   const [failed, setFailed] = useState(false);
   const [pending, start] = useTransition();
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const router = useRouter();
   return (
     <form
       ref={formRef}
+      method="post"
       className={`space-y-4 ${className}`}
       onSubmit={(e) => {
         e.preventDefault();
@@ -55,7 +58,7 @@ export function ActionForm({
         });
       }}
     >
-      <fieldset disabled={pending} className="space-y-4">
+      <fieldset disabled={pending || !ready} className="space-y-4">
         {children}
       </fieldset>
       {message ? (
@@ -66,7 +69,7 @@ export function ActionForm({
           {message}
         </p>
       ) : null}
-      <button className="btn" disabled={pending}>
+      <button className="btn" disabled={pending || !ready}>
         {pending ? (
           <>
             <LoaderCircle size={16} className="animate-spin" />

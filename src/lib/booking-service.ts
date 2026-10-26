@@ -1,3 +1,4 @@
+import { isAccountAllowed } from './account-status';
 import { randomBytes } from 'node:crypto';
 import { Prisma, type AppUser, type JobStatus } from '@prisma/client';
 import { prisma } from './prisma';
@@ -6,24 +7,24 @@ import { canTransition } from './status';
 import { bookingInclude } from './types';
 import { roleForBooking } from './booking-access';
 
-type Actor = Pick<AppUser, 'id' | 'role' | 'active'>;
+type Actor = Pick<AppUser, 'id' | 'role' | 'active'> & { suspendedUntil?: Date | null };
 const transactionOptions = {
   isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
   timeout: 15000,
 };
 function ensureActor(actor: Actor) {
-  if (!actor.active) throw new UserError('บัญชีนี้ถูกระงับ');
+  if (!isAccountAllowed(actor)) throw new UserError('บัญชีนี้ถูกระงับ');
 }
 
 export async function bookJob(actor: Actor, input: unknown) {
   ensureActor(actor);
-  if (actor.role === 'TECHNICIAN')
-    throw new UserError('บัญชีช่างใช้สำหรับรับงาน กรุณาไปที่งานของฉัน');
+  if (actor.role !== 'CUSTOMER') throw new UserError('เฉพาะบัญชีลูกค้าเท่านั้นที่จองช่างได้');
   const parsed = bookingSchema.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0].message);
   const data = parsed.data;
   return prisma.$transaction(async (tx) => {
-    const [setting, technician, service] = await Promise.all([
+    const [customer, setting, technician, service] = await Promise.all([
+      tx.appUser.findUnique({ where: { id: actor.id } }),
       tx.appSetting.findUnique({ where: { id: 'main' } }),
       tx.technician.findUnique({
         where: { id: data.technicianId },
@@ -31,13 +32,15 @@ export async function bookJob(actor: Actor, input: unknown) {
       }),
       tx.service.findUnique({ where: { id: data.serviceId } }),
     ]);
+    if (!customer || !isAccountAllowed(customer) || customer.role !== 'CUSTOMER')
+      throw new UserError('บัญชีนี้ไม่มีสิทธิ์จองช่าง');
     if (!setting?.bookingEnabled) throw new UserError('ระบบพักรับการจองชั่วคราว');
     const dateError = validateAppointment(data.date, data.time, setting.maxAdvanceDays);
     if (dateError) throw new UserError(dateError);
     if (
       !technician?.active ||
       !technician.categoryModel.active ||
-      technician.user?.active === false
+      (technician.user && !isAccountAllowed(technician.user))
     )
       throw new UserError('ช่างนี้ยังไม่เปิดรับงาน');
     if (!service?.active || service.categoryId !== technician.category)
@@ -56,6 +59,7 @@ export async function bookJob(actor: Actor, input: unknown) {
         ...data,
         reference,
         customerId: actor.id,
+        customerName: customer.name,
         serviceName: service.name,
         ...cost,
         payment: { create: { amount: cost.totalAmount } },
@@ -68,6 +72,9 @@ export async function bookJob(actor: Actor, input: unknown) {
 }
 
 async function authorizedBooking(tx: Prisma.TransactionClient, actor: Actor, id: string) {
+  const current = await tx.appUser.findUnique({ where: { id: actor.id } });
+  if (!isAccountAllowed(current) || current?.role !== actor.role)
+    throw new UserError('บัญชีนี้ไม่พร้อมใช้งาน กรุณาเข้าสู่ระบบใหม่');
   const booking = await tx.booking.findUnique({ where: { id }, include: bookingInclude });
   if (!booking) throw new UserError('ไม่พบรายการงาน');
   const allowed = roleForBooking(actor, booking);

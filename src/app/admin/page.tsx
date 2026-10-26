@@ -20,7 +20,10 @@ export default async function AdminDashboard() {
     prisma.technician.count(),
     prisma.appUser.count(),
     prisma.booking.findMany({
-      include: { technician: { select: { name: true } } },
+      include: {
+        technician: { select: { name: true } },
+        customer: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 5,
     }),
@@ -67,7 +70,7 @@ export default async function AdminDashboard() {
             ดูทั้งหมด <ArrowRight size={16} />
           </Link>
         </div>
-        <BookingTable bookings={bookings} />
+        <BookingTable bookings={bookings} admin />
       </section>
       <h2 className="mb-4 mt-8 section-title">เริ่มจัดการระบบ</h2>
       <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
@@ -87,7 +90,7 @@ export default async function AdminDashboard() {
           {
             href: '/admin/settings',
             label: 'ตั้งค่าการจอง',
-            description: 'กำหนดเงื่อนไขและช่องทางติดต่อ',
+            description: 'กำหนดเงื่อนไขและตรวจประวัติการจัดการ',
             icon: Settings2,
           },
         ].map(({ href, label, description, icon: Icon }) => (

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Header } from '@/components/header';
-import { getCurrentUser } from '@/lib/auth';
+import { getAccount } from '@/lib/auth';
+import { accountRestriction, isAccountAllowed } from '@/lib/account-status';
+import { AccountStatusNotice } from '@/components/account-status-notice';
 import { getSettings } from '@/lib/settings';
 import { isDemoMode } from '@/lib/config';
 export const metadata: Metadata = {
@@ -9,20 +11,21 @@ export const metadata: Metadata = {
   description: 'จองช่างและติดตามงานในกรุงเทพมหานคร 50 เขต — WebApps Mini Project',
 };
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [user, settings] = await Promise.all([getCurrentUser(), getSettings().catch(() => null)]);
+  const [account, settings] = await Promise.all([getAccount(), getSettings().catch(() => null)]);
   return (
     <html lang="th">
       <body>
         <Header
+          restricted={Boolean(account && !isAccountAllowed(account))}
           user={
-            user
+            account
               ? {
-                  id: user.id,
-                  name: user.name,
-                  email: user.email,
-                  role: user.role,
-                  phone: user.phone,
-                  avatarPath: user.avatarPath,
+                  id: account.id,
+                  name: account.name,
+                  email: account.email,
+                  role: account.role,
+                  phone: account.phone,
+                  avatarPath: account.avatarPath,
                 }
               : null
           }
@@ -33,6 +36,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             โหมดสาธิตในเครื่อง · ข้อมูลตัวอย่าง · ไม่ส่ง OTP · การชำระเงินจำลอง
           </div>
         ) : null}
+        {account ? <AccountStatusNotice initialMessage={accountRestriction(account)} /> : null}
         {children}
         <footer className="border-t border-line bg-white">
           <div className="shell flex flex-wrap items-center justify-between gap-4 py-5 text-sm text-muted">
@@ -47,7 +51,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               {settings?.contactEmail ? (
                 <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>
               ) : null}
-              </div>
+            </div>
           </div>
         </footer>
       </body>

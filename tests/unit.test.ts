@@ -23,7 +23,8 @@ import {
 
 test('registration validates passwords and public account choices without accepting privilege fields', () => {
   const input = {
-    name: 'ผู้สมัครทดสอบ',
+    firstName: 'ผู้สมัคร',
+    lastName: 'ทดสอบ',
     email: 'EXAMPLE@example.com',
     password: 'ExampleOnly123',
     confirmPassword: 'ExampleOnly123',
@@ -169,7 +170,7 @@ test('verified roles get their own destination and navigation', () => {
 test('technicians cannot create customer bookings, including direct requests', async () => {
   await assert.rejects(
     bookJob({ id: 'tech', role: 'TECHNICIAN', active: true }, {}),
-    /บัญชีช่างใช้สำหรับรับงาน/,
+    /เฉพาะบัญชีลูกค้า/,
   );
 });
 

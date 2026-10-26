@@ -192,13 +192,14 @@ export function BookingDialog({
                 <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
                   <div>
                     <label className="label" htmlFor="customer-name">
-                      ชื่อผู้จอง
+                      ชื่อ-นามสกุลผู้จอง (จากบัญชี)
                     </label>
                     <input
                       id="customer-name"
                       name="customerName"
                       className="input"
-                      defaultValue={user.name}
+                      value={user.name}
+                      readOnly
                       required
                       minLength={2}
                       maxLength={100}

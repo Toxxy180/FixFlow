@@ -2,6 +2,7 @@
 -- Replace the password locally. Never commit the customized file.
 CREATE ROLE fixflow_app LOGIN PASSWORD 'REPLACE_WITH_A_LONG_RANDOM_PASSWORD';
 GRANT USAGE ON SCHEMA public TO fixflow_app;
+GRANT EXECUTE ON FUNCTION public.fixflow_email_status(text) TO fixflow_app;
 DO $$
 DECLARE table_name TEXT;
 BEGIN

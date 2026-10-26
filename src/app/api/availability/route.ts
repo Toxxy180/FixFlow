@@ -1,3 +1,4 @@
+import { isAccountAllowed } from '@/lib/account-status';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateAppointment } from '@/lib/validation';
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     if (
       !technician?.active ||
       !technician.categoryModel.active ||
-      technician.user?.active === false ||
+      (technician.user && !isAccountAllowed(technician.user)) ||
       !setting?.bookingEnabled
     )
       return NextResponse.json({ times: [], reason: 'ช่างหรือระบบพักรับการจองชั่วคราว' });

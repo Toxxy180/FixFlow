@@ -8,7 +8,8 @@ import { prisma } from '@/lib/prisma';
 import { times } from '@/lib/constants';
 import { UserError } from '@/lib/validation';
 import type { ActionResult } from '@/lib/types';
-import { updateManagedUser } from '@/lib/user-management';
+import { isAccountAllowed } from '@/lib/account-status';
+import { managedUserSchema, updateManagedUser } from '@/lib/user-management';
 import {
   approveTechnicianApplication,
   rejectTechnicianApplication,
@@ -126,7 +127,7 @@ export async function saveTechnician(form: FormData): Promise<ActionResult> {
     const pendingApplication = existing?.userId === userId && linkedUser?.role === 'CUSTOMER';
     if (
       userId &&
-      (!linkedUser?.active || (linkedUser.role !== 'TECHNICIAN' && !pendingApplication))
+      (!isAccountAllowed(linkedUser) || (linkedUser?.role !== 'TECHNICIAN' && !pendingApplication))
     )
       throw new UserError('ต้องเลือกผู้ใช้ที่มีสิทธิ์ช่างและยังเปิดใช้งาน');
     if (pendingApplication && form.get('active') === 'on')
@@ -157,30 +158,30 @@ export async function saveTechnician(form: FormData): Promise<ActionResult> {
 
 export async function saveUser(form: FormData): Promise<ActionResult> {
   const actor = await requireRole('ADMIN', '/admin/users');
-  const parsed = z
-    .object({ id: z.uuid(), role: z.enum(['CUSTOMER', 'TECHNICIAN', 'ADMIN']) })
-    .safeParse(Object.fromEntries(form));
-  if (!parsed.success) return { error: 'ข้อมูลผู้ใช้ไม่ถูกต้อง' };
-  const active = form.get('active') === 'on';
-  if (parsed.data.id === actor.id) return { error: 'เปลี่ยนสิทธิ์หรือระงับบัญชีตัวเองไม่ได้' };
-  return mutate('SAVE_USER', parsed.data.id, (tx) =>
-    updateManagedUser(tx, actor, { ...parsed.data, active }),
-  );
+  if (form.has('role')) return { error: 'ไม่อนุญาตให้เปลี่ยนบทบาทผู้ใช้จากหน้านี้' };
+  const parsed = managedUserSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { status, until, reason } = parsed.data;
+  const action = [
+    'ACCOUNT_' + status,
+    status === 'SUSPENDED' ? until + ' (Asia/Bangkok)' : '',
+    reason,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return mutate(action, parsed.data.id, (tx) => updateManagedUser(tx, actor, parsed.data));
 }
 
 export async function saveSettings(form: FormData): Promise<ActionResult> {
   await requireRole('ADMIN', '/admin/settings');
   const parsed = z
     .object({
-      siteName: z.string().trim().min(2).max(40),
-      contactEmail: z.union([z.email(), z.literal('')]),
-      contactPhone: z.string().regex(/^0\d{9}$|^$/),
       maxAdvanceDays: z.coerce.number().int().min(1).max(90),
       cancelBeforeHours: z.coerce.number().int().min(0).max(72),
       travelFee: z.coerce.number().int().min(0).max(10000),
     })
     .safeParse(Object.fromEntries(form));
-  if (!parsed.success) return { error: 'กรุณาตรวจสอบชื่อเว็บ ช่องทางติดต่อ และเงื่อนไขการจอง' };
+  if (!parsed.success) return { error: 'กรุณาตรวจสอบเงื่อนไขการจอง' };
   return mutate('SAVE_SETTINGS', 'main', (tx) =>
     tx.appSetting.update({
       where: { id: 'main' },

@@ -95,6 +95,11 @@ test('PostgreSQL: authorization, immutable prices, unique slots, cancellation, p
       where: { id: first.id },
       include: { payment: true },
     });
+    assert.equal(
+      booking.customerName,
+      'ผู้ทดสอบอัตโนมัติ',
+      'booking name comes from AppUser, not client input',
+    );
     assert.equal(booking.price, 1200);
     assert.equal(booking.payment?.amount, booking.totalAmount);
     await assert.rejects(bookJob(customer, data));

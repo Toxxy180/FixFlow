@@ -1,14 +1,13 @@
-# ตั้งค่าอีเมล + รหัสผ่าน และ Google สำหรับ FixFlow
+# ตั้งค่าอีเมล + รหัสผ่าน สำหรับ FixFlow
 
 ## ระบบที่เตรียมไว้
 
-- `/login`: เข้าด้วยอีเมลและรหัสผ่าน หรือ Google
-- `/register`: เลือกลูกค้า/ช่าง กรอกชื่อ อีเมล รหัสผ่านและยืนยันรหัสผ่าน แล้วกรอก OTP
+- `/login`: เข้าด้วยอีเมลและรหัสผ่าน ยืนยัน OTP เฉพาะตอนสมัครครั้งแรก
+- `/register`: เลือกลูกค้า/ช่าง กรอกชื่อจริง นามสกุล อีเมล รหัสผ่านและยืนยันรหัสผ่าน แล้วกรอก OTP
 - `/forgot-password`: ขออีเมล → คลิกลิงก์ → `/reset-password` → ตั้งรหัสผ่านใหม่ ใช้ตั้งรหัสผ่านครั้งแรกให้บัญชีเดิมได้ด้วย
 - สมัครช่างแล้วต้องกรอกใบสมัคร แนบรูป และรอ Admin อนุมัติ ก่อนปรากฏในหน้าค้นหาและรับงาน ระหว่างรอยังคงใช้สิทธิ์ลูกค้าได้
-- Google ยืนยันตัวตนผ่าน Google จึงไม่ส่ง OTP ของ FixFlow ซ้ำ ผู้สมัครช่างยังต้องผ่าน Admin เหมือนเดิม
 - ชื่อเก็บใน AppUser หลังยืนยันอีเมล รหัสผ่านจัดการโดย Supabase Auth ไม่เก็บรหัสผ่านหรือรหัส OTP ในตาราง AppUser หรือ log
-- ไม่ต้องเพิ่มตารางหรือ migration สำหรับการเปลี่ยนระบบล็อกอินนี้ ชื่อ/ประเภทสมัครเก็บใน Auth metadata และนำมาใช้เฉพาะชื่อแสดง/ทางไปกรอกใบสมัคร สิทธิ์จริงอ่านจาก AppUser เท่านั้น
+- รัน `npx prisma migrate deploy` หลังอัปเดตโค้ดนี้ เพื่อเพิ่มสถานะบัญชีและตัวตรวจอีเมลซ้ำ แล้วรัน `npx prisma generate`
 
 ## 1. Supabase: เปิดอีเมลและการยืนยัน
 
@@ -54,33 +53,14 @@
 
 ในเครื่องใช้ `APP_URL="http://localhost:3000"` ตาม `.env.example` ได้ หากยังไม่ใส่ ระบบใช้ localhost:3000 เป็นค่าเริ่มต้น เมื่อแก้ env ให้เริ่ม dev server ใหม่
 
-## 4. สร้าง Google OAuth Client
+## 4. การตรวจอีเมลซ้ำและ OTP
 
-ทำส่วนนี้ในบัญชีของคุณ ไม่ต้องส่ง Client Secret หรือรหัสผ่านเข้ามาในแชท
-
-1. เปิด [Google Cloud Console](https://console.cloud.google.com/) แล้วเลือกหรือสร้างโปรเจกต์สำหรับ FixFlow
-2. เปิด **Google Auth Platform** กำหนด Branding: ชื่อ FixFlow, อีเมลสำหรับติดต่อ และข้อมูลที่ระบบร้องขอ
-3. ตั้ง Audience ให้เหมาะกับผู้ทดสอบ หากยังเป็น Testing ให้เพิ่มบัญชี Google ที่จะใช้สาธิตใน Test users
-4. เปิด **Clients → Create client → Web application**
-5. Authorized JavaScript origins: ใส่ `http://localhost:3000` และ URL จริงหลัง Deploy (เฉพาะ origin ไม่มี `/auth/callback`)
-6. Authorized redirect URIs: คัดลอก Callback URL จาก **Supabase → Authentication → Sign In / Providers → Google**
-
-สำหรับโปรเจกต์ Supabase นี้ URL คือ:
-
-```text
-https://zznyawsqfqsxxincxjwp.supabase.co/auth/v1/callback
-```
-
-7. สร้างแล้วนำ Client ID และ Client Secret ไปใส่ในหน้า Google provider ของ Supabase เปิดใช้งานและบันทึก
-8. เปิดหน้า FixFlow `/login` ใหม่ ปุ่ม Google จะเปิดใช้งานเมื่อ Supabase เปิด provider แล้ว ถ้ายังปิดอยู่ ปุ่มจะแสดงว่ายังไม่พร้อมใช้งาน
-
-Google ใช้ callback ของ **Supabase** ส่วน Supabase ใช้ callback ของ **FixFlow** จึงมี URL คนละอัน:
-
-```text
-FixFlow → Supabase → Google → Supabase /auth/v1/callback → FixFlow /auth/callback
-```
-
-Client Secret อยู่ใน Supabase เท่านั้น ไม่เพิ่ม Google Client Secret ใน `.env` ของ Next.js และไม่ใส่ใน Git
+- อีเมลที่ยืนยันแล้ว: แจ้งว่ามีบัญชีอยู่แล้ว ให้เข้าสู่ระบบหรือกู้รหัสผ่าน
+- อีเมลที่ยังไม่ยืนยัน: ส่ง OTP สำหรับบัญชีเดิม ไม่เขียนทับชื่อหรือรหัสผ่านด้วยข้อมูลสมัครรอบใหม่
+- บัญชีที่ล็อกอินแต่ยังไม่ยืนยัน: ส่งรหัส signup ใหม่ พร้อมเวลารอส่งซ้ำ
+- บัญชีที่ยืนยันแล้ว: ล็อกอินด้วยรหัสผ่านได้เลย ไม่ส่ง OTP ทุกครั้ง
+- การตรวจอีเมลมี rate limit ฝั่งเซิร์ฟเวอร์ และใช้ฟังก์ชันฐานข้อมูลที่ให้สิทธิ์เฉพาะ runtime role คืนเพียงสถานะ ไม่เปิดตาราง Auth ผ่าน Data API
+- นำปุ่มและ server action Google ออกแล้ว หากเคยเปิด Google provider ใน Supabase ให้ปิดที่ Authentication → Sign In / Providers → Google ด้วย บัญชีเดิมยังใช้ลืมรหัสผ่านเพื่อตั้งรหัสผ่านได้
 
 ## 5. บัญชีเดิมและ Admin
 
@@ -101,14 +81,11 @@ Callback ต้องแลก PKCE code สำเร็จและเป็น
 - ลืมรหัสผ่าน: หลังส่งแสดงคำแนะนำให้ตรวจอีเมล ไม่มีช่อง OTP ส่งลิงก์ซ้ำได้หลัง 60 วินาที ลิงก์ที่ถูกต้องเปิดหน้าตั้งรหัสผ่าน ลิงก์หมดอายุ/ใช้แล้วหรือเปิดต่างเบราว์เซอร์ต้องไม่ให้เปลี่ยนรหัสผ่าน
 - Login ผิดต้องไม่บอกว่ามีอีเมลนั้นอยู่ในระบบหรือไม่
 - บัญชีเดิมตั้งรหัสผ่านครั้งแรกได้ และ Admin ยังคงเป็น Admin
-- Google จากหน้าล็อกอิน และ Google จากหน้าสมัครที่เลือกช่าง
-- กดยกเลิก Google ต้องกลับมาข้อความที่เข้าใจได้ ไม่แสดง token/error ดิบ
-- บัญชีถูกระงับต้องเข้าไม่ได้ทั้งรหัสผ่าน Google และการกู้รหัสผ่าน
+- บัญชีถูกระงับต้องเข้าไม่ได้ด้วย session เดิมหรือหลังใส่รหัสผ่าน ต้องเห็นหน้าแจ้งสถานะ และทำรายการที่ต้องล็อกอินไม่ได้
 - Deploy แล้วทดสอบซ้ำด้วย HTTPS และ callback URL จริง
 
 ## เอกสารทางการ
 
 - [Supabase Password Auth](https://supabase.com/docs/guides/auth/passwords)
-- [Supabase Google OAuth](https://supabase.com/docs/guides/auth/social-sign-in/auth-google)
 - [Resend signup confirmation](https://supabase.com/docs/reference/javascript/auth-resend)
 - [Verify OTP](https://supabase.com/docs/reference/javascript/auth-verifyotp)
