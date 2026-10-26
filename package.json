@@ -10,6 +10,7 @@
     "build": "prisma generate && next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "brand:export": "node scripts/export-brand.mjs",
     "db:setup": "prisma migrate deploy && prisma generate && node prisma/seed.mjs",
     "db:local": "prisma dev --name fixflow --port 51213 --db-port 51214 --shadow-db-port 51215",
     "dev:demo": "node scripts/dev-demo.mjs",

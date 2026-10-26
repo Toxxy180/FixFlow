@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useRef } from 'react';
-import { Wrench, LogOut, ChevronDown, ArrowLeft } from 'lucide-react';
+import { LogOut, ChevronDown, ArrowLeft } from 'lucide-react';
 import { signOut } from '@/app/auth/actions';
 import type { PublicUser } from '@/lib/types';
 import { mainNavigation } from '@/lib/navigation';
@@ -26,9 +27,15 @@ export function Header({
           className="flex shrink-0 items-center gap-3 text-[27px] font-bold tracking-tight"
           aria-label="FixFlow หน้าแรก"
         >
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white">
-            <Wrench size={27} strokeWidth={2.5} />
-          </span>
+          <Image
+            unoptimized
+            src="/brand/fixflow-logo.svg"
+            width={44}
+            height={44}
+            alt=""
+            loading="eager"
+            className="h-11 w-11 shrink-0"
+          />
           {siteName}
         </Link>
         {['/login', '/register', '/forgot-password', '/reset-password', '/auth/recovery'].includes(

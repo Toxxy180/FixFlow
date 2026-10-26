@@ -6,6 +6,7 @@ import { accountRestriction, isAccountAllowed } from '@/lib/account-status';
 import { AccountStatusNotice } from '@/components/account-status-notice';
 import { getSettings } from '@/lib/settings';
 import { isDemoMode } from '@/lib/config';
+import { icons } from 'lucide-react';
 export const metadata: Metadata = {
   title: 'FixFlow | จองช่าง ดูแลบ้าน',
   description: 'จองช่างและติดตามงานในกรุงเทพมหานคร 50 เขต',
