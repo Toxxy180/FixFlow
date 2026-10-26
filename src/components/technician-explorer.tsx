@@ -172,7 +172,7 @@ export function TechnicianExplorer({
               ช่างพร้อมดูแลบ้านคุณ
             </h2>
             <p className="mt-1 text-sm text-muted">
-              {filtered.length} คน · ข้อมูลช่างตัวอย่างสำหรับ Mini Project
+              ช่างที่พร้อมดูแลมี {filtered.length} คน
             </p>
           </div>
           <label className="flex items-center gap-3 text-xs text-muted">

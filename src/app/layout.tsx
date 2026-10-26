@@ -8,7 +8,7 @@ import { getSettings } from '@/lib/settings';
 import { isDemoMode } from '@/lib/config';
 export const metadata: Metadata = {
   title: 'FixFlow | จองช่าง ดูแลบ้าน',
-  description: 'จองช่างและติดตามงานในกรุงเทพมหานคร 50 เขต — WebApps Mini Project',
+  description: 'จองช่างและติดตามงานในกรุงเทพมหานคร 50 เขต',
 };
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const [account, settings] = await Promise.all([getAccount(), getSettings().catch(() => null)]);
