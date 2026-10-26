@@ -58,6 +58,12 @@ export async function createRegistration(
   input: z.output<typeof registrationSchema>,
   status: EmailStatus,
   auth: Pick<SupabaseClient['auth'], 'signUp' | 'resend' | 'signOut'>,
+  persistIntent: (
+    id: string,
+    email: string,
+    role: 'CUSTOMER' | 'TECHNICIAN',
+    phone: string,
+  ) => Promise<void>,
 ): Promise<AuthActionResult> {
   if (status === 'CONFIRMED') return { error: duplicateEmailMessage };
   // Reusing an unverified address must not overwrite its original password or identity.
@@ -67,7 +73,14 @@ export async function createRegistration(
   const { data, error } = await auth.signUp({
     email: input.email,
     password: input.password,
-    options: { data: { display_name: name, full_name: name, signup_type: input.signupType } },
+    options: {
+      data: {
+        display_name: name,
+        full_name: name,
+        signup_type: input.signupType,
+        phone: input.phone,
+      },
+    },
   });
   if (error) return authSendError(error);
   // Supabase can return an obfuscated user for a concurrent duplicate signup.
@@ -77,6 +90,7 @@ export async function createRegistration(
     return { error: 'ระบบยืนยันอีเมลยังไม่ได้เปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ' };
   }
   if (!data.user) return { error: 'สมัครไม่สำเร็จ กรุณาลองใหม่' };
+  await persistIntent(data.user.id, input.email, input.signupType, input.phone);
   return {
     success: true,
     step: 'VERIFY',

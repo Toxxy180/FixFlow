@@ -9,6 +9,7 @@ import {
   addJobPart,
   removeJobPart,
   payDemoJob,
+  preparePromptPay,
   reviewJob,
 } from '../src/lib/booking-service';
 import { bangkokDate } from '../src/lib/constants';
@@ -56,7 +57,12 @@ test('PostgreSQL: authorization, immutable prices, unique slots, cancellation, p
   try {
     for (const actor of [customer, stranger, techUser])
       await prisma.appUser.create({
-        data: { ...actor, email: `${actor.id}@test.example`, name: 'ผู้ทดสอบอัตโนมัติ' },
+        data: {
+          ...actor,
+          email: `${actor.id}@test.example`,
+          name: 'ผู้ทดสอบอัตโนมัติ',
+          phone: '0812345678',
+        },
       });
     await prisma.service.create({
       data: { id: serviceId, name: 'บริการทดสอบ', categoryId: 'AIRCON', price: 1200 },
@@ -129,6 +135,12 @@ test('PostgreSQL: authorization, immutable prices, unique slots, cancellation, p
     await advanceJob(techUser, second.id, 'AWAITING_PAYMENT');
     await assert.rejects(addJobPart(techUser, second.id, 'แอบเพิ่ม', 1, 1));
     await assert.rejects(payDemoJob(stranger, second.id));
+    await assert.rejects(payDemoJob(customer, second.id));
+    await assert.rejects(preparePromptPay(stranger, second.id));
+    await assert.rejects(preparePromptPay(techUser, second.id));
+    const qr = await preparePromptPay(customer, second.id);
+    assert.equal(qr.phone, '0812345678');
+    assert.equal(qr.amount, booking.totalAmount);
     await payDemoJob(customer, second.id);
     await assert.rejects(payDemoJob(customer, second.id));
     await reviewJob(customer, second.id, 5, 'ทดสอบครบขั้นตอน');

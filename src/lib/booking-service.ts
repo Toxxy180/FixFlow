@@ -6,6 +6,7 @@ import { bookingSchema, quote, UserError, validateAppointment } from './validati
 import { canTransition } from './status';
 import { bookingInclude } from './types';
 import { roleForBooking } from './booking-access';
+import { mobilePhoneSchema } from './phone';
 
 type Actor = Pick<AppUser, 'id' | 'role' | 'active'> & { suspendedUntil?: Date | null };
 const transactionOptions = {
@@ -39,8 +40,10 @@ export async function bookJob(actor: Actor, input: unknown) {
     if (dateError) throw new UserError(dateError);
     if (
       !technician?.active ||
+      !['NONE', 'APPROVED'].includes(technician.applicationStatus) ||
       !technician.categoryModel.active ||
-      (technician.user && !isAccountAllowed(technician.user))
+      (technician.user &&
+        (!isAccountAllowed(technician.user) || technician.user.role !== 'TECHNICIAN'))
     )
       throw new UserError('ช่างนี้ยังไม่เปิดรับงาน');
     if (!service?.active || service.categoryId !== technician.category)
@@ -79,6 +82,12 @@ async function authorizedBooking(tx: Prisma.TransactionClient, actor: Actor, id:
   if (!booking) throw new UserError('ไม่พบรายการงาน');
   const allowed = roleForBooking(actor, booking);
   if (!allowed) throw new UserError('คุณไม่มีสิทธิ์จัดการงานนี้');
+  if (
+    allowed === 'TECHNICIAN' &&
+    (!booking.technician.active ||
+      !['NONE', 'APPROVED'].includes(booking.technician.applicationStatus))
+  )
+    throw new UserError('โปรไฟล์ช่างต้องได้รับอนุมัติและเปิดรับงานก่อน');
   return booking;
 }
 
@@ -191,14 +200,21 @@ export async function payDemoJob(actor: Actor, id: string) {
   return prisma.$transaction(async (tx) => {
     const booking = await authorizedBooking(tx, actor, id);
     if (
+      actor.role !== 'CUSTOMER' ||
       booking.customerId !== actor.id ||
       booking.status !== 'AWAITING_PAYMENT' ||
       booking.payment?.status === 'PAID'
     )
       throw new UserError('รายการนี้ยังไม่พร้อมชำระเงิน');
+    if (!booking.payment?.recipientPhone) throw new UserError('กรุณาเปิด QR ชำระเงินก่อนยืนยัน');
     await tx.payment.update({
       where: { bookingId: id },
-      data: { amount: booking.totalAmount, status: 'PAID', paidAt: new Date() },
+      data: {
+        amount: booking.totalAmount,
+        status: 'PAID',
+        mode: 'PROMPTPAY_DEMO',
+        paidAt: new Date(),
+      },
     });
     await tx.booking.update({
       where: { id },
@@ -208,7 +224,7 @@ export async function payDemoJob(actor: Actor, id: string) {
           create: {
             actorId: actor.id,
             status: 'COMPLETED',
-            note: 'ยืนยันการชำระเงินจำลอง ไม่มีธุรกรรมเงินจริง',
+            note: 'ลูกค้ายืนยันสถานะชำระเงินจำลอง ระบบไม่ได้ตรวจสอบการโอนเงินจริง',
           },
         },
       },
@@ -222,7 +238,12 @@ export async function reviewJob(actor: Actor, id: string, rating: number, commen
     throw new UserError('คะแนนต้องอยู่ระหว่าง 1–5 และข้อความไม่เกิน 500 ตัวอักษร');
   return prisma.$transaction(async (tx) => {
     const booking = await authorizedBooking(tx, actor, id);
-    if (booking.customerId !== actor.id || booking.status !== 'COMPLETED' || booking.review)
+    if (
+      actor.role !== 'CUSTOMER' ||
+      booking.customerId !== actor.id ||
+      booking.status !== 'COMPLETED' ||
+      booking.review
+    )
       throw new UserError('รีวิวได้หนึ่งครั้งหลังงานเสร็จสิ้นเท่านั้น');
     await tx.review.create({
       data: {
@@ -233,5 +254,46 @@ export async function reviewJob(actor: Actor, id: string, rating: number, commen
         comment: comment.trim(),
       },
     });
+  }, transactionOptions);
+}
+
+export async function preparePromptPay(actor: Actor, id: string) {
+  ensureActor(actor);
+  if (actor.role !== 'CUSTOMER') throw new UserError('เฉพาะลูกค้าเจ้าของงานเท่านั้น');
+  return prisma.$transaction(async (tx) => {
+    const booking = await authorizedBooking(tx, actor, id);
+    if (
+      booking.customerId !== actor.id ||
+      booking.status !== 'AWAITING_PAYMENT' ||
+      !booking.payment ||
+      booking.payment.status === 'PAID'
+    )
+      throw new UserError('รายการนี้ยังไม่พร้อมชำระเงิน');
+    if (booking.totalAmount <= 0) throw new UserError('ยอดชำระต้องมากกว่าศูนย์');
+    let phone = booking.payment.recipientPhone;
+    let name = booking.payment.recipientName;
+    if (!phone) {
+      const recipient = booking.technician.userId
+        ? await tx.appUser.findUnique({
+            where: { id: booking.technician.userId },
+            select: { phone: true, name: true, role: true },
+          })
+        : null;
+      if (
+        !recipient ||
+        recipient.role !== 'TECHNICIAN' ||
+        !mobilePhoneSchema.safeParse(recipient.phone).success
+      )
+        throw new UserError(
+          'ช่างยังไม่มีเบอร์รับเงิน กรุณาให้ช่างตั้งเบอร์ที่ผูก PromptPay ในบัญชีก่อน',
+        );
+      phone = recipient.phone;
+      name = recipient.name;
+      await tx.payment.update({
+        where: { bookingId: id },
+        data: { recipientPhone: phone, recipientName: name, mode: 'PROMPTPAY_DEMO' },
+      });
+    }
+    return { phone, name: name || booking.technician.name, amount: booking.totalAmount };
   }, transactionOptions);
 }

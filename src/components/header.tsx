@@ -31,7 +31,9 @@ export function Header({
           </span>
           {siteName}
         </Link>
-        {['/login', '/register', '/forgot-password', '/reset-password'].includes(pathname) ? (
+        {['/login', '/register', '/forgot-password', '/reset-password', '/auth/recovery'].includes(
+          pathname,
+        ) ? (
           <Link
             href="/"
             className="ml-auto flex items-center gap-2 text-sm font-semibold text-primary"
@@ -92,14 +94,7 @@ export function Header({
                     >
                       {restricted ? 'สถานะบัญชี' : 'บัญชีของฉัน'}
                     </Link>
-                    {restricted ? null : user.role === 'CUSTOMER' ? (
-                      <Link
-                        href="/technician/apply"
-                        className="block rounded-lg px-3 py-2 text-sm hover:bg-soft"
-                      >
-                        สมัครเป็นช่าง / เปิดรับงาน
-                      </Link>
-                    ) : user.role === 'TECHNICIAN' ? (
+                    {restricted ? null : user.role === 'TECHNICIAN' ? (
                       <Link
                         href="/technician"
                         className="block rounded-lg px-3 py-2 text-sm hover:bg-soft"

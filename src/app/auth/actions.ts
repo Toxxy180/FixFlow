@@ -26,7 +26,9 @@ import {
   duplicateEmailMessage,
   type EmailStatus,
 } from '@/lib/signup-service';
-import { consumeRecoveryTicket } from '@/lib/auth-recovery';
+import { consumeRecoveryTicket, issueRecoveryTicket } from '@/lib/auth-recovery';
+import { rememberRegistration } from '@/lib/registration-intent';
+import { mobilePhoneSchema } from '@/lib/phone';
 
 async function throttle(kind: string, email: string, limit: number, seconds: number) {
   const ip = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
@@ -119,7 +121,12 @@ export async function registerAccount(form: FormData): Promise<AuthActionResult>
         error: 'กรุณารอ 60 วินาทีก่อนขอรหัสใหม่ และใช้รหัสล่าสุดที่ได้รับ',
         retryAfter: 60,
       };
-    return await createRegistration(parsed.data, status, (await createClient()).auth);
+    return await createRegistration(
+      parsed.data,
+      status,
+      (await createClient()).auth,
+      rememberRegistration,
+    );
   } catch {
     return { error: 'สมัครไม่สำเร็จ กรุณาลองใหม่' };
   }
@@ -168,7 +175,7 @@ export async function sendPasswordReset(input: string): Promise<AuthActionResult
     const { error } = await (
       await createClient()
     ).auth.resetPasswordForEmail(email.data, {
-      redirectTo: `${applicationOrigin()}/auth/callback`,
+      redirectTo: `${applicationOrigin()}/auth/recovery`,
     });
     if (error) return { error: 'ส่งลิงก์ไม่สำเร็จ กรุณาลองใหม่' };
     return { success: true, step: 'EMAIL_SENT' };
@@ -230,10 +237,33 @@ export async function signOut() {
 export async function updateProfile(formData: FormData): Promise<ActionResult> {
   const user = await requireUser('/account');
   const parsed = z
-    .object({ name: z.string().trim().min(2).max(100), phone: z.string().regex(/^0\d{9}$|^$/) })
+    .object({ name: z.string().trim().min(2).max(100), phone: mobilePhoneSchema })
     .safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: 'กรุณากรอกชื่อและเบอร์โทรให้ถูกต้อง' };
   await prisma.appUser.update({ where: { id: user.id }, data: parsed.data });
   revalidatePath('/', 'layout');
   return { success: true };
+}
+
+export async function confirmPasswordRecovery(form: FormData): Promise<AuthActionResult> {
+  const tokenHash = form.get('token_hash');
+  if (typeof tokenHash !== 'string' || !/^[a-f0-9]{64}$/i.test(tokenHash))
+    return { error: 'ลิงก์ไม่ถูกต้อง กรุณาขอลิงก์ใหม่' };
+  try {
+    if (!(await throttle('recovery-verify-ip', '', 20, 600)))
+      return { error: 'ลองบ่อยเกินไป กรุณารอสักครู่' };
+    const client = await createClient();
+    const { data, error } = await client.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: 'recovery',
+    });
+    if (error || !data.user?.email_confirmed_at)
+      return { error: 'ลิงก์หมดอายุหรือถูกใช้แล้ว กรุณาขอลิงก์ใหม่' };
+    const profile = await syncVerifiedProfile(data.user);
+    if (!isAccountAllowed(profile)) return { success: true, redirectTo: '/account-status' };
+    await issueRecoveryTicket(data.user.id);
+    return { success: true, redirectTo: '/reset-password' };
+  } catch {
+    return { error: 'ยืนยันลิงก์ไม่สำเร็จ กรุณาลองใหม่' };
+  }
 }

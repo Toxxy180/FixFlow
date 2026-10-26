@@ -177,7 +177,8 @@ export function AccountProfileForm({
             name="phone"
             type="tel"
             className="input"
-            pattern="0[0-9]{9}|^$"
+            required
+            pattern="0[689][0-9]{8}"
             maxLength={10}
             value={draftPhone}
             onChange={(event) => {

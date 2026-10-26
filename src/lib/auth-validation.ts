@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { mobilePhoneSchema } from './phone';
 import type { User } from '@supabase/supabase-js';
 
 export const emailSchema = z
@@ -27,6 +28,7 @@ export const registrationSchema = passwordPairSchema.safeExtend({
   lastName: z.string().trim().min(1, 'กรุณากรอกนามสกุล').max(50),
   email: emailSchema,
   signupType: signupTypeSchema,
+  phone: mobilePhoneSchema,
 });
 
 // Metadata may describe a display name or onboarding choice, never an authorization role.
@@ -56,13 +58,13 @@ export function verifiedProfileData(
 
 export function signupDestination(
   role: string,
-  signupType: unknown,
+  _signupType?: unknown,
   applicationStatus?: string | null,
 ) {
   if (role === 'ADMIN') return '/admin';
-  if (role === 'TECHNICIAN') return '/technician';
-  if (role !== 'CUSTOMER' || signupType !== 'TECHNICIAN') return '/';
-  return !applicationStatus || applicationStatus === 'NONE' ? '/technician/apply' : '/account';
+  if (role === 'TECHNICIAN')
+    return !applicationStatus || applicationStatus === 'NONE' ? '/technician/apply' : '/technician';
+  return '/';
 }
 
 export function applicationOrigin(env: Record<string, string | undefined> = process.env) {

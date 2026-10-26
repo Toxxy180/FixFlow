@@ -2,15 +2,28 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { registrationSchema } from '../src/lib/auth-validation';
-import { createRegistration, resendConfirmation, passwordLogin } from '../src/lib/signup-service';
+import {
+  createRegistration as registrationService,
+  resendConfirmation,
+  passwordLogin,
+} from '../src/lib/signup-service';
 import { accountStatus, isAccountAllowed, accountRestriction } from '../src/lib/account-status';
 import { managedUserSchema } from '../src/lib/user-management';
 import { bookJob } from '../src/lib/booking-service';
+
+const intentCalls: unknown[][] = [];
+const createRegistration = (
+  ...args: Parameters<typeof registrationService> extends [...infer A, unknown] ? A : never
+) =>
+  registrationService(...args, async (...intent) => {
+    intentCalls.push(intent);
+  });
 
 const input = registrationSchema.parse({
   firstName: ' สมชาย ',
   lastName: ' ทดสอบ ',
   email: 'TEST@example.com',
+  phone: '0812345678',
   password: 'TestOnly123',
   confirmPassword: 'TestOnly123',
   signupType: 'TECHNICIAN',
@@ -70,12 +83,19 @@ test('new registration sends signup OTP and records full name, never the passwor
             display_name: 'สมชาย ทดสอบ',
             full_name: 'สมชาย ทดสอบ',
             signup_type: 'TECHNICIAN',
+            phone: input.phone,
           },
         },
       },
     },
   ]);
-  for (const field of ['firstName', 'lastName'])
+  assert.deepEqual(intentCalls.at(-1), [
+    '00000000-0000-4000-8000-000000000001',
+    input.email,
+    'TECHNICIAN',
+    input.phone,
+  ]);
+  for (const field of ['firstName', 'lastName', 'phone'])
     assert.equal(registrationSchema.safeParse({ ...input, [field]: '' }).success, false);
 });
 test('duplicate confirmed email never sends mail; pending signup resends without overwriting credentials', async () => {

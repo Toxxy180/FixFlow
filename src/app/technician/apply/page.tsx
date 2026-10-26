@@ -9,6 +9,7 @@ import { ImageUploader } from '@/components/image-uploader';
 
 export default async function TechnicianApplication() {
   const user = await requireUser('/technician/apply');
+  if (user.role !== 'TECHNICIAN') redirect('/forbidden');
   const [existing, categories, districts, images] = await Promise.all([
     prisma.technician.findUnique({ where: { userId: user.id }, include: { areas: true } }),
     prisma.serviceCategory.findMany({ where: { active: true }, select: { id: true, name: true } }),
@@ -19,8 +20,7 @@ export default async function TechnicianApplication() {
       orderBy: { createdAt: 'asc' },
     }),
   ]);
-  if (user.role === 'ADMIN') redirect('/admin');
-  if (user.role !== 'CUSTOMER' || existing?.applicationStatus === 'APPROVED') redirect('/account');
+  if (existing?.applicationStatus === 'APPROVED') redirect('/account');
   return (
     <main className="shell max-w-3xl py-10">
       <Link href="/account" className="text-sm text-primary">
@@ -28,8 +28,8 @@ export default async function TechnicianApplication() {
       </Link>
       <h1 className="page-title mt-5">สมัครเป็นช่าง</h1>
       <p className="my-5 text-sm text-muted">
-        กรอกข้อมูลให้ผู้ดูแลตรวจสอบ เมื่ออนุมัติแล้วโปรไฟล์จะแสดงบนหน้าค้นหา
-        ระหว่างรอคุณยังจองบริการได้
+        กรอกข้อมูลให้ผู้ดูแลตรวจสอบ เมื่ออนุมัติแล้วโปรไฟล์จะแสดงบนหน้าค้นหา บัญชีนี้เป็นช่างแล้ว
+        และจะรับงานได้หลัง Admin อนุมัติเท่านั้น
       </p>
       {existing?.applicationReviewNote ? (
         <p className="mb-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">

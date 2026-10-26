@@ -1,6 +1,8 @@
 'use server';
 import { Prisma, JobStatus } from '@prisma/client';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
+import QRCode from 'qrcode';
+import { promptPayPayload } from '@/lib/promptpay';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth';
 import {
@@ -10,6 +12,7 @@ import {
   addJobPart,
   removeJobPart,
   payDemoJob,
+  preparePromptPay,
   reviewJob,
 } from '@/lib/booking-service';
 import { UserError } from '@/lib/validation';
@@ -18,6 +21,7 @@ import type { ActionResult } from '@/lib/types';
 async function run(operation: () => Promise<unknown>, id?: string): Promise<ActionResult> {
   try {
     await operation();
+    updateTag('public-catalog');
     for (const path of ['/bookings', '/technician', '/admin', '/admin/bookings', '/'])
       revalidatePath(path);
     if (id) revalidatePath(`/bookings/${id}`);
@@ -82,4 +86,24 @@ export async function submitReview(formData: FormData) {
       reviewJob(user, id, Number(formData.get('rating')), String(formData.get('comment') || '')),
     id,
   );
+}
+
+export async function getPaymentQr(
+  id: string,
+): Promise<{ qr: string; phone: string; name: string; amount: number } | { error: string }> {
+  const user = await requireUser();
+  if (!id || id.length > 100) return { error: 'รายการไม่ถูกต้อง' };
+  try {
+    const details = await preparePromptPay(user, id);
+    const qr = await QRCode.toDataURL(promptPayPayload(details.phone, details.amount), {
+      width: 320,
+      margin: 4,
+      errorCorrectionLevel: 'M',
+    });
+    return { ...details, qr };
+  } catch (error) {
+    return {
+      error: error instanceof UserError ? error.message : 'สร้าง QR ไม่สำเร็จ กรุณาลองใหม่',
+    };
+  }
 }

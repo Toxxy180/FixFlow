@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
@@ -56,6 +56,7 @@ export async function POST(request: Request) {
         console.warn('Previous avatar cleanup unavailable');
       }
     }
+    revalidateTag('public-catalog', { expire: 0 });
     revalidatePath('/', 'layout');
     return Response.json({ profile: result.profile, image: result.image });
   } catch (error) {

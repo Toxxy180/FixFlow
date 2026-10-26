@@ -14,7 +14,7 @@ export default async function TechnicianDetail({ params }: { params: Promise<{ i
     prisma.technician.findUnique({
       where: { id },
       include: {
-        user: { select: { active: true, suspendedUntil: true, avatarPath: true } },
+        user: { select: { active: true, suspendedUntil: true, avatarPath: true, role: true } },
         categoryModel: {
           include: { services: { where: { active: true }, orderBy: { price: 'asc' } } },
         },
@@ -34,8 +34,10 @@ export default async function TechnicianDetail({ params }: { params: Promise<{ i
   const own = Boolean(user && technician.userId === user.id);
   const available =
     technician.active &&
+    ['NONE', 'APPROVED'].includes(technician.applicationStatus) &&
     technician.categoryModel.active &&
-    (!technician.user || isAccountAllowed(technician.user));
+    (!technician.user ||
+      (technician.user.role === 'TECHNICIAN' && isAccountAllowed(technician.user)));
   if (!available && !own && user?.role !== 'ADMIN') notFound();
   const rating = await prisma.review.aggregate({
     where: { technicianId: id },

@@ -42,7 +42,7 @@ export default async function ApplicationDetail({ params }: { params: Promise<{ 
       })
     : [];
   const pending =
-    application.applicationStatus === 'PENDING' && application.user?.role === 'CUSTOMER';
+    application.applicationStatus === 'PENDING' && application.user?.role === 'TECHNICIAN';
   const status = {
     NONE: 'โปรไฟล์ที่ผู้ดูแลสร้าง',
     PENDING: 'รอ Admin ตรวจสอบ',

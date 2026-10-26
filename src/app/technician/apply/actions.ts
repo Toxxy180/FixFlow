@@ -1,5 +1,5 @@
 'use server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { requireUser } from '@/lib/auth';
 import { submitTechnicianApplication } from '@/lib/technician-application';
 import { UserError } from '@/lib/validation';
@@ -15,6 +15,7 @@ export async function applyAsTechnician(form: FormData): Promise<ActionResult> {
       availableTimes: form.getAll('availableTimes'),
       portfolioPaths: form.getAll('portfolioPaths'),
     });
+    updateTag('public-catalog');
     revalidatePath('/', 'layout');
     return { success: true, redirectTo: '/account' };
   } catch (error) {

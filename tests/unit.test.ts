@@ -26,6 +26,7 @@ test('registration validates passwords and public account choices without accept
     firstName: 'ผู้สมัคร',
     lastName: 'ทดสอบ',
     email: 'EXAMPLE@example.com',
+    phone: '0812345678',
     password: 'ExampleOnly123',
     confirmPassword: 'ExampleOnly123',
     signupType: 'TECHNICIAN',
@@ -79,9 +80,9 @@ test('verified signup and Google profiles never copy roles, passwords or activat
 });
 
 test('technician signup continues onboarding and preserves admin and approved technician destinations', () => {
-  assert.equal(signupDestination('CUSTOMER', 'TECHNICIAN'), '/technician/apply');
-  assert.equal(signupDestination('CUSTOMER', 'TECHNICIAN', 'PENDING'), '/account');
-  assert.equal(signupDestination('CUSTOMER', 'TECHNICIAN', 'REJECTED'), '/account');
+  assert.equal(signupDestination('CUSTOMER', 'TECHNICIAN'), '/');
+  assert.equal(signupDestination('CUSTOMER', 'TECHNICIAN', 'PENDING'), '/');
+  assert.equal(signupDestination('CUSTOMER', 'TECHNICIAN', 'REJECTED'), '/');
   assert.equal(signupDestination('TECHNICIAN', 'TECHNICIAN', 'APPROVED'), '/technician');
   assert.equal(signupDestination('ADMIN', 'TECHNICIAN'), '/admin');
   assert.equal(signupDestination('CUSTOMER', 'ADMIN'), '/');
@@ -185,7 +186,7 @@ test('profile validation accepts only editable fields and validates phone and na
     }),
     { name: 'ชื่อใหม่', phone: '0800000000' },
   );
-  assert.equal(accountProfileSchema.safeParse({ name: 'ชื่อ', phone: '' }).success, true);
+  assert.equal(accountProfileSchema.safeParse({ name: 'ชื่อ', phone: '' }).success, false);
   for (const input of [
     { name: ' ', phone: '' },
     { name: 'ชื่อ', phone: '123' },
@@ -219,10 +220,10 @@ test('multipart uploads enforce origin and streaming size limits before parsing'
   await assert.rejects(limitedImageForm(new Request(url)), /ไม่พบข้อมูล/);
 });
 
-test('technician acting as a customer cannot advance their own order or manage another technician job', () => {
+test('technician cannot act as a customer even on a historical purchase', () => {
   const actor = { id: 'buyer-tech', role: 'TECHNICIAN' as const };
   const ownPurchase = { customerId: actor.id, technician: { userId: 'other-tech' } };
-  assert.equal(roleForBooking(actor, ownPurchase), 'CUSTOMER');
+  assert.equal(roleForBooking(actor, ownPurchase), null);
   assert.equal(canTransition('PENDING', 'ACCEPTED', roleForBooking(actor, ownPurchase)!), false);
   assert.equal(
     roleForBooking(actor, { customerId: 'other-buyer', technician: { userId: 'other-tech' } }),

@@ -33,7 +33,9 @@ export const getAccount = cache(async () => {
   if (!hasSupabase()) return null;
   const user = await getAuthIdentity();
   if (!user) return null;
-  const profile = await syncVerifiedProfile(user);
+  const profile =
+    (await prisma.appUser.findUnique({ where: { id: user.id } })) ??
+    (await syncVerifiedProfile(user));
   return profile;
 });
 

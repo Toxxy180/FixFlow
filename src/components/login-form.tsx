@@ -82,7 +82,7 @@ export function LoginForm({
       <h1 className="text-3xl font-bold max-sm:text-2xl">{title}</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted">
         {step === 'EMAIL_SENT'
-          ? `หากมีบัญชี ${email} ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้ กรุณาเปิดอีเมลแล้วคลิกลิงก์ในเบราว์เซอร์เดียวกับที่ขอ`
+          ? `หากมีบัญชี ${email} ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้ กรุณาเปิดอีเมลล่าสุดแล้วคลิกลิงก์ตั้งรหัสผ่าน`
           : step === 'VERIFY'
             ? `ยืนยันบัญชี ${email} ด้วยรหัสล่าสุดที่ได้รับ หากยังไม่ได้รับให้กดส่งรหัสอีกครั้ง`
             : step === 'RESET'
@@ -179,9 +179,35 @@ export function LoginForm({
                 <p className="flex gap-2 rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
                   <ShieldCheck size={18} className="shrink-0" />
                   หลังยืนยันบัญชี ให้กรอกข้อมูลและแนบรูปผลงาน ช่างจะเปิดรับงานได้เมื่อ Admin อนุมัติ
-                  ระหว่างรอยังจองบริการได้
+                  บัญชีช่างใช้จองบริการในบทบาทลูกค้าไม่ได้
                 </p>
               ) : null}
+              <p className="text-xs leading-relaxed text-muted">
+                หนึ่งบัญชีเลือกได้หนึ่งบทบาท และเปลี่ยนเป็นอีกบทบาทหลังสมัครไม่ได้
+              </p>
+              <div>
+                <label htmlFor="phone" className="label">
+                  เบอร์โทรศัพท์มือถือ
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  className="input"
+                  pattern="0[689][0-9]{8}"
+                  minLength={10}
+                  maxLength={10}
+                  required
+                  placeholder="0812345678"
+                />
+                <p className="mt-2 text-xs text-muted">
+                  {signupType === 'TECHNICIAN'
+                    ? 'ใช้เบอร์จริงที่ผูก PromptPay เพื่อให้ลูกค้าสแกนจ่ายค่าบริการ'
+                    : 'ใช้เบอร์จริงสำหรับติดต่อเรื่องการจอง'}
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
                 <div>
                   <label htmlFor="firstName" className="label">

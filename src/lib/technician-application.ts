@@ -3,12 +3,13 @@ import { Prisma, type AppUser } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from './prisma';
 import { times } from './constants';
+import { mobilePhoneSchema } from './phone';
 import { UserError } from './validation';
 import { validImagePath, MAX_PORTFOLIO_IMAGES } from './images';
 
 export const technicianApplicationSchema = z.object({
   name: z.string().trim().min(2).max(80),
-  phone: z.string().regex(/^0\d{9}$/),
+  phone: mobilePhoneSchema,
   category: z.string().min(1),
   description: z.string().trim().min(5).max(500),
   price: z.coerce.number().int().min(0).max(100000),
@@ -50,8 +51,8 @@ export async function submitTechnicianApplication(actor: Pick<AppUser, 'id'>, in
         where: { id: actor.id },
         include: { technician: true },
       });
-      if (!user || !isAccountAllowed(user) || user.role !== 'CUSTOMER')
-        throw new UserError('สมัครช่างได้จากบัญชีลูกค้าที่เปิดใช้งานเท่านั้น');
+      if (!user || !isAccountAllowed(user) || user.role !== 'TECHNICIAN')
+        throw new UserError('เฉพาะบัญชีที่เลือกสมัครเป็นช่างตั้งแต่แรกเท่านั้น');
       if (user.technician?.applicationStatus === 'APPROVED')
         throw new UserError('ใบสมัครนี้ได้รับอนุมัติแล้ว');
       const ids = [...new Set(districtIds)];
@@ -110,7 +111,7 @@ export async function approveTechnicianApplication(tx: Prisma.TransactionClient,
     technician.applicationStatus !== 'PENDING' ||
     !technician.user ||
     !isAccountAllowed(technician.user) ||
-    technician.user.role !== 'CUSTOMER'
+    technician.user.role !== 'TECHNICIAN'
   )
     throw new UserError('ไม่พบใบสมัครที่รออนุมัติ');
   const imageCount = await tx.userImage.count({
@@ -129,7 +130,6 @@ export async function approveTechnicianApplication(tx: Prisma.TransactionClient,
     !technician.availableTimes.length
   )
     throw new UserError('กรุณาตรวจประเภทช่าง พื้นที่ และตารางเวลาก่อนอนุมัติ');
-  await tx.appUser.update({ where: { id: technician.user.id }, data: { role: 'TECHNICIAN' } });
   await tx.technician.update({
     where: { id },
     data: {
@@ -152,7 +152,7 @@ export async function rejectTechnicianApplication(
   if (
     !application ||
     application.applicationStatus !== 'PENDING' ||
-    application.user?.role !== 'CUSTOMER'
+    application.user?.role !== 'TECHNICIAN'
   )
     throw new UserError('ไม่พบใบสมัครที่รอตรวจสอบ');
   await tx.technician.update({

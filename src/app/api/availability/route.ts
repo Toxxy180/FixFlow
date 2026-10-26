@@ -16,8 +16,10 @@ export async function GET(request: Request) {
     ]);
     if (
       !technician?.active ||
+      !['NONE', 'APPROVED'].includes(technician.applicationStatus) ||
       !technician.categoryModel.active ||
-      (technician.user && !isAccountAllowed(technician.user)) ||
+      (technician.user &&
+        (technician.user.role !== 'TECHNICIAN' || !isAccountAllowed(technician.user))) ||
       !setting?.bookingEnabled
     )
       return NextResponse.json({ times: [], reason: 'ช่างหรือระบบพักรับการจองชั่วคราว' });

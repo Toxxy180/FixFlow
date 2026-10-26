@@ -1,16 +1,10 @@
 'use client';
 import type { JobStatus, Role } from '@prisma/client';
-import {
-  cancelBooking,
-  changeJobStatus,
-  payDemo,
-  submitReview,
-  addPart,
-  removePart,
-} from '@/app/actions';
+import { cancelBooking, changeJobStatus, submitReview, addPart, removePart } from '@/app/actions';
 import { nextStatus, transitionLabels } from '@/lib/status';
 import { ActionForm } from './action-form';
 import { MutationButton } from './mutation-button';
+import { PromptPayPayment } from './promptpay-payment';
 export function JobControls({
   id,
   status,
@@ -28,21 +22,7 @@ export function JobControls({
       {(role === 'ADMIN' || role === 'TECHNICIAN') && next ? (
         <MutationButton action={() => changeJobStatus(id, next)} label={transitionLabels[next]!} />
       ) : null}
-      {role === 'CUSTOMER' && status === 'AWAITING_PAYMENT' ? (
-        <div className="rounded-xl bg-soft p-5">
-          <h2 className="text-lg font-semibold">ชำระเงินจำลอง</h2>
-          <p className="mb-4 mt-2 text-sm leading-relaxed text-muted">
-            ใช้สำหรับสาธิต Mini Project ไม่มีการโอนเงินจริง
-            <br />
-            เมื่อยืนยัน ระบบจะบันทึกการชำระและปิดงาน
-          </p>
-          <MutationButton
-            action={() => payDemo(id)}
-            label="ยืนยันการชำระเงินจำลอง"
-            confirm="ยืนยันบันทึกการชำระเงินจำลองและปิดงานนี้? ไม่มีธุรกรรมเงินจริง"
-          />
-        </div>
-      ) : null}
+      {role === 'CUSTOMER' && status === 'AWAITING_PAYMENT' ? <PromptPayPayment id={id} /> : null}
       {(role === 'ADMIN' && !['COMPLETED', 'CANCELLED'].includes(status)) ||
       (role === 'CUSTOMER' && ['PENDING', 'ACCEPTED'].includes(status)) ||
       (role === 'TECHNICIAN' && status === 'PENDING') ? (

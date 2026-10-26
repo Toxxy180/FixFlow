@@ -1,7 +1,7 @@
 'use server';
 import { randomBytes } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { z } from 'zod';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -39,6 +39,7 @@ async function mutate(
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000 },
     );
+    updateTag('public-catalog');
     revalidatePath('/', 'layout');
     revalidatePath('/admin', 'layout');
     return { success: true };
@@ -124,11 +125,11 @@ export async function saveTechnician(form: FormData): Promise<ActionResult> {
     ]);
     if (areas.length !== districtIds.length || !category)
       throw new UserError('เขตหรือหมวดหมู่ไม่ถูกต้อง');
-    const pendingApplication = existing?.userId === userId && linkedUser?.role === 'CUSTOMER';
-    if (
-      userId &&
-      (!isAccountAllowed(linkedUser) || (linkedUser?.role !== 'TECHNICIAN' && !pendingApplication))
-    )
+    const pendingApplication =
+      existing?.userId === userId &&
+      ['PENDING', 'REJECTED'].includes(existing?.applicationStatus || '') &&
+      !!userId;
+    if (userId && (!isAccountAllowed(linkedUser) || linkedUser?.role !== 'TECHNICIAN'))
       throw new UserError('ต้องเลือกผู้ใช้ที่มีสิทธิ์ช่างและยังเปิดใช้งาน');
     if (pendingApplication && form.get('active') === 'on')
       throw new UserError('ใบสมัครนี้รออนุมัติ กรุณาใช้ปุ่มอนุมัติและเปิดรับงาน');
@@ -148,7 +149,11 @@ export async function saveTechnician(form: FormData): Promise<ActionResult> {
       workDays,
       availableTimes,
     };
-    await tx.technician.upsert({ where: { id }, update: data, create: { id, ...data } });
+    await tx.technician.upsert({
+      where: { id },
+      update: data,
+      create: { id, ...data, applicationStatus: userId ? 'APPROVED' : 'NONE' },
+    });
     await tx.technicianDistrict.deleteMany({ where: { technicianId: id } });
     await tx.technicianDistrict.createMany({
       data: districtIds.map((districtId) => ({ technicianId: id, districtId })),

@@ -11,7 +11,7 @@ export default async function Account() {
       select: { id: true, path: true },
       take: 1,
     }),
-    user.role !== 'ADMIN'
+    user.role === 'TECHNICIAN'
       ? prisma.technician.findUnique({
           where: { userId: user.id },
           select: { active: true, applicationStatus: true, applicationReviewNote: true },
@@ -33,52 +33,32 @@ export default async function Account() {
         {user.role === 'TECHNICIAN' ? (
           <div className="panel mt-6 text-sm">
             <p className="mb-3 text-muted">
-              {technician?.active
-                ? 'โปรไฟล์ช่างของคุณได้รับอนุมัติและเปิดรับงานแล้ว'
-                : 'โปรไฟล์ยังไม่เปิดรับงาน กรุณาติดต่อผู้ดูแลระบบ'}
+              เบอร์โทรในบัญชีนี้ใช้สร้าง QR รับเงินจากลูกค้า ต้องผูก PromptPay กับธนาคารแล้ว
             </p>
-            <Link href="/technician" className="font-semibold text-primary">
-              ไปที่งานของฉัน →
+            <p className="mb-3" role="status">
+              {technician?.applicationStatus === 'PENDING'
+                ? 'ส่งใบสมัครแล้ว รอ Admin อนุมัติก่อนรับงาน'
+                : technician?.applicationStatus === 'REJECTED'
+                  ? 'กรุณาแก้ไขใบสมัคร: ' + technician.applicationReviewNote
+                  : technician?.active
+                    ? 'โปรไฟล์ช่างเปิดรับงานแล้ว'
+                    : technician?.applicationStatus === 'APPROVED'
+                      ? 'โปรไฟล์พักรับงาน กรุณาติดต่อ Admin'
+                      : 'กรุณากรอกใบสมัครให้ Admin ตรวจสอบก่อนรับงาน'}
+            </p>
+            <Link
+              href={
+                !technician || ['PENDING', 'REJECTED'].includes(technician.applicationStatus)
+                  ? '/technician/apply'
+                  : '/technician'
+              }
+              className="font-semibold text-primary"
+            >
+              {!technician || ['PENDING', 'REJECTED'].includes(technician.applicationStatus)
+                ? 'กรอกข้อมูล / ดูใบสมัครช่าง →'
+                : 'ไปที่งานของฉัน →'}
             </Link>
           </div>
-        ) : user.role === 'CUSTOMER' ? (
-          <details className="mt-6 rounded-xl border border-line bg-white p-5">
-            <summary className="cursor-pointer font-semibold text-primary">
-              สมัครเป็นช่าง / เปิดรับงาน
-            </summary>
-            <div className="mt-4 space-y-3 text-sm">
-              {technician ? (
-                <p role="status" className="rounded-lg bg-amber-50 p-3 text-amber-900">
-                  {technician.applicationStatus === 'APPROVED'
-                    ? 'โปรไฟล์ช่างเดิมยังถูกเก็บไว้ ปัจจุบันบัญชีเป็นลูกค้า กรุณาติดต่อผู้ดูแลระบบหากต้องการกลับมาเปิดรับงาน'
-                    : technician.applicationStatus === 'NONE'
-                      ? 'ยังไม่ได้ส่งใบสมัคร กรุณากรอกข้อมูลและแนบรูปเพื่อให้ผู้ดูแลตรวจสอบ'
-                      : technician.applicationStatus === 'REJECTED'
-                        ? `Admin ขอให้แก้ไขใบสมัคร: ${technician.applicationReviewNote}`
-                        : 'ส่งใบสมัครช่างแล้ว รอ Admin ตรวจสอบและอนุมัติ ระหว่างนี้คุณยังจองบริการได้ตามปกติ'}
-                </p>
-              ) : (
-                <>
-                  <p className="text-muted">
-                    ต้องการเปิดรับงานในกรุงเทพฯ? กรอกข้อมูลบริการ พื้นที่ และเวลารับงาน แล้วรอ Admin
-                    อนุมัติ
-                  </p>
-                  <Link href="/technician/apply" className="btn text-sm">
-                    กรอกใบสมัครช่าง
-                  </Link>
-                </>
-              )}
-              {technician &&
-              user.role === 'CUSTOMER' &&
-              technician.applicationStatus !== 'APPROVED' ? (
-                <Link href="/technician/apply" className="btn text-sm">
-                  {technician.applicationStatus === 'NONE'
-                    ? 'กรอกใบสมัครช่าง'
-                    : 'ดูรายละเอียด / แก้ไขใบสมัคร'}
-                </Link>
-              ) : null}
-            </div>
-          </details>
         ) : null}
       </div>
     </main>

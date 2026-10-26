@@ -206,6 +206,8 @@ model Payment {
   amount    Int
   status    PaymentStatus @default(UNPAID)
   mode      String @default("DEMO")
+  recipientPhone String?
+  recipientName String?
   paidAt    DateTime?
 }
 
@@ -249,4 +251,12 @@ model AuditLog {
   targetId  String
   createdAt DateTime @default(now())
   @@index([createdAt])
+}
+
+model RegistrationIntent {
+  id String @id @db.Uuid
+  email String
+  role Role
+  phone String
+  createdAt DateTime @default(now())
 }

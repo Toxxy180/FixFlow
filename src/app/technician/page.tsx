@@ -5,16 +5,23 @@ import { BookingTable } from '@/components/booking-table';
 export default async function TechnicianDashboard() {
   const user = await requireRole('TECHNICIAN', '/technician');
   const technician = await prisma.technician.findUnique({ where: { userId: user.id } });
-  if (!technician)
+  if (!technician || ['PENDING', 'REJECTED'].includes(technician.applicationStatus))
     return (
       <main className="shell min-h-[70dvh] py-12">
         <h1 className="page-title">งานของฉัน</h1>
         <p className="mt-5 text-muted">
-          บัญชีช่างนี้ยังไม่ได้เชื่อมกับโปรไฟล์ช่าง กรุณาให้ Admin เชื่อมบัญชีในเมนูจัดการช่าง
+          {technician?.applicationStatus === 'PENDING'
+            ? 'ใบสมัครอยู่ระหว่างตรวจสอบ จะรับงานได้เมื่อ Admin อนุมัติ'
+            : technician?.applicationStatus === 'REJECTED'
+              ? 'กรุณาแก้ไขใบสมัคร: ' + technician.applicationReviewNote
+              : 'กรุณากรอกข้อมูลและส่งใบสมัครให้ Admin ตรวจสอบก่อนรับงาน'}
         </p>
+        <Link className="btn mt-5" href="/technician/apply">
+          กรอกข้อมูล / ดูใบสมัครช่าง
+        </Link>
       </main>
     );
-  const [bookings, pending, working, completed] = await Promise.all([
+  const [bookings, counts] = await Promise.all([
     prisma.booking.findMany({
       where: { technicianId: technician.id },
       include: {
@@ -24,15 +31,19 @@ export default async function TechnicianDashboard() {
       orderBy: { createdAt: 'desc' },
       take: 50,
     }),
-    prisma.booking.count({ where: { technicianId: technician.id, status: 'PENDING' } }),
-    prisma.booking.count({
-      where: {
-        technicianId: technician.id,
-        status: { in: ['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'AWAITING_PAYMENT'] },
-      },
+    prisma.booking.groupBy({
+      by: ['status'],
+      where: { technicianId: technician.id },
+      _count: { _all: true },
     }),
-    prisma.booking.count({ where: { technicianId: technician.id, status: 'COMPLETED' } }),
   ]);
+  const count = (statuses: string[]) =>
+    counts
+      .filter((row) => statuses.includes(row.status))
+      .reduce((sum, row) => sum + row._count._all, 0);
+  const pending = count(['PENDING']);
+  const working = count(['ACCEPTED', 'ON_THE_WAY', 'IN_PROGRESS', 'AWAITING_PAYMENT']);
+  const completed = count(['COMPLETED']);
   return (
     <main className="shell min-h-[70dvh] py-10">
       <h1 className="page-title">งานของฉัน</h1>

@@ -6,7 +6,7 @@ GRANT EXECUTE ON FUNCTION public.fixflow_email_status(text) TO fixflow_app;
 DO $$
 DECLARE table_name TEXT;
 BEGIN
-  FOREACH table_name IN ARRAY ARRAY['AppUser','District','ServiceCategory','Service','Technician','TechnicianDistrict','Booking','Slot','JobStatusHistory','JobPartItem','Payment','Review','AppSetting','RateLimit','AuditLog','UserImage'] LOOP
+  FOREACH table_name IN ARRAY ARRAY['AppUser','District','ServiceCategory','Service','Technician','TechnicianDistrict','Booking','Slot','JobStatusHistory','JobPartItem','Payment','Review','AppSetting','RateLimit','AuditLog','UserImage','RegistrationIntent'] LOOP
     EXECUTE format('GRANT SELECT, INSERT, UPDATE ON TABLE public.%I TO fixflow_app', table_name);
     EXECUTE format('CREATE POLICY fixflow_backend_access ON public.%I FOR ALL TO fixflow_app USING (true) WITH CHECK (true)', table_name);
   END LOOP;

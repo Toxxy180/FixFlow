@@ -1,3 +1,4 @@
+import { mobilePhoneSchema } from './phone';
 import { isAccountAllowed } from '@/lib/account-status';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -6,10 +7,7 @@ import { UserError } from './validation';
 
 export const accountProfileSchema = z.object({
   name: z.string().trim().min(2).max(100),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^0\d{9}$|^$/),
+  phone: mobilePhoneSchema,
 });
 export type AvatarChange = { action: 'KEEP' | 'REMOVE' } | { action: 'REPLACE'; path: string };
 

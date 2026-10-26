@@ -16,7 +16,7 @@ export default async function AdminTechnicians() {
     prisma.appUser.findMany({
       where: {
         active: true,
-        OR: [{ role: 'TECHNICIAN' }, { role: 'CUSTOMER', technician: { isNot: null } }],
+        role: 'TECHNICIAN',
       },
       select: { id: true, name: true, email: true },
     }),

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
@@ -22,6 +22,8 @@ export async function POST(request: Request) {
     const form = await limitedImageForm(request);
     const kind = form.get('kind') as ImageKind;
     if (!['AVATAR', 'PORTFOLIO'].includes(kind)) throw new UserError('ประเภทของรูปไม่ถูกต้อง');
+    if (kind === 'PORTFOLIO' && user.role !== 'TECHNICIAN')
+      return Response.json({ error: 'เฉพาะบัญชีช่างเท่านั้น' }, { status: 403 });
     const file = form.get('file');
     if (!(file instanceof File)) throw new UserError('กรุณาเลือกไฟล์รูป');
     if (!(await imageUploadAllowed(user.id)))
@@ -67,6 +69,7 @@ export async function POST(request: Request) {
     uploadedPath = '';
     if (previous.length)
       await client.storage.from(bucket).remove(previous.map((item) => item.path));
+    revalidateTag('public-catalog', { expire: 0 });
     revalidatePath('/', 'layout');
     return Response.json({
       image: { id: record.id, path: record.path, url: `/api/images/${record.id}` },
@@ -112,6 +115,7 @@ export async function DELETE(request: Request) {
     );
     const client = await createClient();
     await client.storage.from(imageBucket(image.kind as ImageKind)).remove([image.path]);
+    revalidateTag('public-catalog', { expire: 0 });
     revalidatePath('/', 'layout');
     return Response.json({ success: true });
   } catch (error) {
