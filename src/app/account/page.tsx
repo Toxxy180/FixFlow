@@ -58,6 +58,11 @@ export default async function Account() {
                 ? 'กรอกข้อมูล / ดูใบสมัครช่าง →'
                 : 'ไปที่งานของฉัน →'}
             </Link>
+            {technician && ['APPROVED', 'NONE'].includes(technician.applicationStatus) ? (
+              <Link href="/technician/profile" className="mt-4 block font-semibold text-primary">
+                แก้ไขข้อมูลรับงาน ราคา และพื้นที่ให้บริการ →
+              </Link>
+            ) : null}
           </div>
         ) : null}
       </div>

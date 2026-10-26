@@ -95,12 +95,20 @@ export function Header({
                       {restricted ? 'สถานะบัญชี' : 'บัญชีของฉัน'}
                     </Link>
                     {restricted ? null : user.role === 'TECHNICIAN' ? (
-                      <Link
-                        href="/technician"
-                        className="block rounded-lg px-3 py-2 text-sm hover:bg-soft"
-                      >
-                        งานของฉัน
-                      </Link>
+                      <>
+                        <Link
+                          href="/technician"
+                          className="block rounded-lg px-3 py-2 text-sm hover:bg-soft"
+                        >
+                          งานของฉัน
+                        </Link>
+                        <Link
+                          href="/technician/profile"
+                          className="block rounded-lg px-3 py-2 text-sm hover:bg-soft"
+                        >
+                          แก้ไขข้อมูลรับงาน
+                        </Link>
+                      </>
                     ) : null}
                     <form action={signOut}>
                       <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50">

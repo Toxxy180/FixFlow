@@ -46,7 +46,12 @@ export default async function TechnicianDashboard() {
   const completed = count(['COMPLETED']);
   return (
     <main className="shell min-h-[70dvh] py-10">
-      <h1 className="page-title">งานของฉัน</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="page-title">งานของฉัน</h1>
+        <Link href="/technician/profile" className="btn">
+          แก้ไขข้อมูลรับงาน
+        </Link>
+      </div>
       <p className="mt-2 text-sm text-muted">{technician.name} · รับงานและอัปเดตสถานะบริการ</p>
       <div className="my-7 grid grid-cols-3 gap-4 max-sm:grid-cols-1">
         {[

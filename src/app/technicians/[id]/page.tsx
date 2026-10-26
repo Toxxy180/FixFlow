@@ -82,9 +82,14 @@ export default async function TechnicianDetail({ params }: { params: Promise<{ i
             </p>
           </div>
           {own ? (
-            <Link href="/technician" className="btn">
-              ไปงานของฉัน
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/technician" className="btn">
+                ไปงานของฉัน
+              </Link>
+              <Link href="/technician/profile" className="btn-secondary">
+                แก้ไขข้อมูลรับงาน
+              </Link>
+            </div>
           ) : user?.role === 'ADMIN' ? (
             <Link href={`/admin/technicians/${id}`} className="btn-secondary">
               จัดการข้อมูลช่าง

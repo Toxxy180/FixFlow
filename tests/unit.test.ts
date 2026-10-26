@@ -325,6 +325,8 @@ test('redirect destinations cannot be external, protocol-relative, or script URL
   assert.equal(safeNext('/\\example.com'), '/bookings');
   assert.equal(safeNext('javascript:alert(1)'), '/bookings');
   assert.equal(safeNext('/admin/settings'), '/admin/settings');
+  assert.equal(safeNext('/technician/profile'), '/technician/profile');
+  assert.equal(safeNext('/technician/profile?next=https://example.com'), '/bookings');
   assert.equal(safeNext('/'), '/');
 });
 test('demo authentication cannot be activated in production or against cloud data', () => {

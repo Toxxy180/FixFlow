@@ -20,6 +20,7 @@
     "test:db": "tsx --env-file=.env --test tests/booking.integration.test.ts",
     "test:accounts": "tsx --env-file=.env --test tests/user-management.integration.test.ts",
     "test:profile": "tsx --env-file=.env --test tests/account-profile.integration.test.ts",
+    "test:technician": "tsx --env-file=.env --test tests/technician-profile.integration.test.ts",
     "db:seed": "node prisma/seed.mjs",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"

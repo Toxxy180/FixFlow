@@ -18,7 +18,7 @@ export function safeNext(value?: string | null) {
   if (value === '/') return '/';
   if (
     !value ||
-    !/^\/(bookings(?:\/[^/?#]+)?|account|choose-role|admin(?:\/[a-z]+)?|technician(?:\/apply)?)$/.test(
+    !/^\/(bookings(?:\/[^/?#]+)?|account|choose-role|admin(?:\/[a-z]+)?|technician(?:\/(?:apply|profile))?)$/.test(
       value,
     )
   )

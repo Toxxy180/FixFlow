@@ -4,6 +4,7 @@ const labels: Record<string, string> = {
   ACCOUNT_SUSPENDED: 'ระงับบัญชีชั่วคราว',
   SAVE_SETTINGS: 'แก้ไขเงื่อนไขการจอง',
   SAVE_TECHNICIAN: 'แก้ไขข้อมูลช่าง',
+  UPDATE_OWN_TECHNICIAN: 'ช่างแก้ไขข้อมูลรับงานของตนเอง',
   APPROVE_TECHNICIAN: 'อนุมัติช่าง',
   REJECT_TECHNICIAN: 'ส่งกลับใบสมัครช่าง',
   APPLY_TECHNICIAN: 'ส่งใบสมัครช่าง',

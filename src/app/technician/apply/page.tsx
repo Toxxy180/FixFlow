@@ -20,7 +20,8 @@ export default async function TechnicianApplication() {
       orderBy: { createdAt: 'asc' },
     }),
   ]);
-  if (existing?.applicationStatus === 'APPROVED') redirect('/account');
+  if (existing && ['APPROVED', 'NONE'].includes(existing.applicationStatus))
+    redirect('/technician/profile');
   return (
     <main className="shell max-w-3xl py-10">
       <Link href="/account" className="text-sm text-primary">
