@@ -36,7 +36,7 @@ function PortfolioImageUploader({
       <p className="text-xs leading-relaxed text-muted">
         {avatar
           ? 'รูปโปรไฟล์จะแสดงบนเว็บ ทุกระดับบัญชีอัปโหลดได้'
-          : 'เจ้าของบัญชีและ Admin เท่านั้นที่ดูรูปเหล่านี้ได้'}{' '}
+          : 'รูปประกอบใบสมัครเป็นส่วนตัวระหว่างตรวจสอบ เมื่ออนุมัติและเปิดรับงานแล้ว รูปจะแสดงในหน้ารายละเอียดช่าง'}{' '}
         · JPG, PNG, WebP ไม่เกิน 2 MB ต่อรูป
       </p>
       <div className="flex flex-wrap gap-3">

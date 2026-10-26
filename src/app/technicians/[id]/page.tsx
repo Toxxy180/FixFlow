@@ -3,10 +3,11 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
-import { isAccountAllowed } from '@/lib/account-status';
+import { isPublicTechnician } from '@/lib/technician-visibility';
 import { bangkokDate, currency } from '@/lib/constants';
 import { UserAvatar } from '@/components/user-avatar';
 import { TechnicianBookingButton } from '@/components/technician-booking-button';
+import { TechnicianPortfolio } from '@/components/technician-portfolio';
 export default async function TechnicianDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (id.length > 100) notFound();
@@ -32,16 +33,27 @@ export default async function TechnicianDetail({ params }: { params: Promise<{ i
   ]);
   if (!technician) notFound();
   const own = Boolean(user && technician.userId === user.id);
-  const available =
-    technician.active &&
-    ['NONE', 'APPROVED'].includes(technician.applicationStatus) &&
-    technician.categoryModel.active &&
-    (!technician.user ||
-      (technician.user.role === 'TECHNICIAN' && isAccountAllowed(technician.user)));
+  const available = isPublicTechnician(technician);
   if (!available && !own && user?.role !== 'ADMIN') notFound();
-  const rating = await prisma.review.aggregate({
-    where: { technicianId: id },
-    _avg: { rating: true },
+  const [rating, portfolio] = await Promise.all([
+    prisma.review.aggregate({
+      where: { technicianId: id },
+      _avg: { rating: true },
+    }),
+    technician.userId && technician.portfolioPaths.length
+      ? prisma.userImage.findMany({
+          where: {
+            ownerId: technician.userId,
+            kind: 'PORTFOLIO',
+            path: { in: technician.portfolioPaths },
+          },
+          select: { id: true, path: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const images = technician.portfolioPaths.flatMap((path) => {
+    const image = portfolio.find((image) => image.path === path);
+    return image ? [{ id: image.id }] : [];
   });
   const details = {
     id,
@@ -100,6 +112,7 @@ export default async function TechnicianDetail({ params }: { params: Promise<{ i
           {technician.description}
         </p>
       </section>
+      <TechnicianPortfolio name={technician.name} images={images} />
       <div className="mt-6 grid grid-cols-[1.4fr_1fr] gap-6 max-lg:grid-cols-1">
         <section className="panel">
           <h2 className="section-title">บริการและราคา</h2>

@@ -6,20 +6,35 @@ import { prisma } from '@/lib/prisma';
 import { updateTechnicianProfile } from '@/lib/technician-profile';
 import { UserError } from '@/lib/validation';
 import type { ActionResult } from '@/lib/types';
+import { createClient } from '@/lib/supabase/server';
+import { imageBucket } from '@/lib/images';
 
 export async function saveMyTechnicianProfile(form: FormData): Promise<ActionResult> {
   const user = await requireRole('TECHNICIAN', '/technician/profile');
   try {
-    const id = await prisma.$transaction(
+    const { _portfolioEditor, ...fields } = Object.fromEntries(form);
+    const { id, obsoletePaths } = await prisma.$transaction(
       (tx) =>
         updateTechnicianProfile(tx, user.id, {
-          ...Object.fromEntries(form),
+          ...fields,
           districtIds: form.getAll('districtIds'),
           workDays: form.getAll('workDays'),
           availableTimes: form.getAll('availableTimes'),
+          ...(_portfolioEditor === 'true' || form.has('portfolioPaths')
+            ? { portfolioPaths: form.getAll('portfolioPaths') }
+            : {}),
         }),
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000 },
     );
+    if (obsoletePaths.length) {
+      try {
+        const client = await createClient();
+        const { error } = await client.storage.from(imageBucket('PORTFOLIO')).remove(obsoletePaths);
+        if (error) console.error('Obsolete portfolio storage cleanup failed', error.name);
+      } catch {
+        console.error('Obsolete portfolio storage cleanup unavailable');
+      }
+    }
     updateTag('public-catalog');
     for (const path of [
       '/technician/profile',

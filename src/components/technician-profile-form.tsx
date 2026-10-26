@@ -3,6 +3,9 @@ import { useState } from 'react';
 import { saveMyTechnicianProfile } from '@/app/technician/profile/actions';
 import { times } from '@/lib/constants';
 import { ActionForm } from './action-form';
+import { PortfolioEditor, type PortfolioSelection } from './portfolio-editor';
+import type { UploadedImage } from './image-uploader';
+import type { ActionResult } from '@/lib/types';
 
 type WorkProfile = {
   name: string;
@@ -20,14 +23,66 @@ export function TechnicianProfileForm({
   technician,
   categories,
   districts,
+  images,
 }: {
   technician: WorkProfile;
   categories: { id: string; name: string; active: boolean }[];
   districts: { id: string; name: string }[];
+  images: UploadedImage[];
 }) {
   const [selected, setSelected] = useState(technician.districtIds);
+  const [portfolio, setPortfolio] = useState<PortfolioSelection[]>(
+    images.map((image) => ({ kind: 'saved', image })),
+  );
+
+  async function saveWithPhotos(form: FormData): Promise<ActionResult> {
+    const uploads: UploadedImage[] = [];
+    const next: UploadedImage[] = [];
+    let saved = false;
+    try {
+      for (const item of portfolio) {
+        if (item.kind === 'saved') {
+          next.push(item.image);
+          continue;
+        }
+        const upload = new FormData();
+        upload.set('kind', 'PORTFOLIO');
+        upload.set('purpose', 'WORK_PROFILE');
+        upload.set('file', item.file);
+        const response = await fetch('/api/images', { method: 'POST', body: upload });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'อัปโหลดรูปผลงานไม่สำเร็จ');
+        uploads.push(result.image);
+        next.push(result.image);
+      }
+      form.set('_portfolioEditor', 'true');
+      form.delete('portfolioPaths');
+      for (const image of next) form.append('portfolioPaths', image.path);
+      const result = await saveMyTechnicianProfile(form);
+      if (result.success) {
+        saved = true;
+        setPortfolio(next.map((image) => ({ kind: 'saved', image })));
+      }
+      return result;
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'บันทึกรูปผลงานไม่สำเร็จ กรุณาลองใหม่',
+      };
+    } finally {
+      if (!saved)
+        await Promise.allSettled(
+          uploads.map((image) =>
+            fetch('/api/images', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: image.id }),
+            }),
+          ),
+        );
+    }
+  }
   return (
-    <ActionForm action={saveMyTechnicianProfile} label="บันทึกข้อมูลรับงาน">
+    <ActionForm action={saveWithPhotos} label="บันทึกข้อมูลรับงาน">
       <div>
         <label className="label" htmlFor="work-name">
           ชื่อช่างที่แสดงให้ลูกค้าเห็น
@@ -188,6 +243,7 @@ export function TechnicianProfileForm({
           ))}
         </div>
       </fieldset>
+      <PortfolioEditor images={portfolio} savedImages={images} onChange={setPortfolio} />
       <div>
         <label className="label" htmlFor="work-portfolio-url">
           ลิงก์ผลงานหรือเพจ (ไม่บังคับ)

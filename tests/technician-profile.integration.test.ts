@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../src/lib/prisma';
 import { updateTechnicianProfile } from '../src/lib/technician-profile';
 
-test('technicians edit only their approved work profile; moderation, evidence and existing bookings are preserved', async () => {
+test('technicians edit their own work profile and photos; ownership, moderation and existing bookings are preserved', async () => {
   const ownerId = randomUUID();
   const otherId = randomUUID();
   const rollback = new Error('ROLLBACK_TECHNICIAN_PROFILE');
@@ -114,7 +114,7 @@ test('technicians edit only their approved work profile; moderation, evidence an
           await assert.rejects(
             updateTechnicianProfile(tx, ownerId, { ...input, portfolioUrl: 'javascript:alert(1)' }),
           );
-          const id = await updateTechnicianProfile(tx, ownerId, input);
+          const { id } = await updateTechnicianProfile(tx, ownerId, input);
           assert.equal(id, tech.id);
           const saved = await tx.technician.findUniqueOrThrow({
             where: { id },
@@ -153,6 +153,106 @@ test('technicians edit only their approved work profile; moderation, evidence an
             }),
             1,
           );
+          const replacement = `${ownerId}/${randomUUID()}.webp`;
+          const foreignPhoto = `${otherId}/${randomUUID()}.webp`;
+          const avatar = `${ownerId}/${randomUUID()}.webp`;
+          await tx.userImage.createMany({
+            data: [
+              { ownerId, kind: 'PORTFOLIO', path: evidence },
+              { ownerId, kind: 'PORTFOLIO', path: replacement },
+              { ownerId: otherId, kind: 'PORTFOLIO', path: foreignPhoto },
+              { ownerId, kind: 'AVATAR', path: avatar },
+            ],
+          });
+          const published = async (path: string) =>
+            (
+              await tx.$queryRaw<
+                { allowed: boolean }[]
+              >`SELECT public.fixflow_public_portfolio(${path}::text) AS allowed`
+            )[0].allowed;
+          assert.equal(await published(evidence), false, 'paused profiles stay private');
+          await tx.technician.update({ where: { id }, data: { active: true } });
+          assert.equal(await published(evidence), true);
+          assert.equal(await published(replacement), false, 'unselected uploads stay private');
+          assert.equal(await published(foreignPhoto), false);
+          assert.equal(await published(avatar), false);
+          for (const applicationStatus of ['PENDING', 'REJECTED'] as const) {
+            await tx.technician.update({ where: { id }, data: { applicationStatus } });
+            assert.equal(await published(evidence), false);
+          }
+          await tx.technician.update({ where: { id }, data: { applicationStatus: 'APPROVED' } });
+          await tx.appUser.update({
+            where: { id: ownerId },
+            data: { suspendedUntil: new Date('2099-01-01') },
+          });
+          assert.equal(await published(evidence), false);
+          await tx.appUser.update({
+            where: { id: ownerId },
+            data: { suspendedUntil: new Date('2000-01-01') },
+          });
+          assert.equal(await published(evidence), true);
+          await tx.appUser.update({ where: { id: ownerId }, data: { active: false } });
+          assert.equal(await published(evidence), false);
+          await tx.appUser.update({
+            where: { id: ownerId },
+            data: { active: true, suspendedUntil: null },
+          });
+          await tx.serviceCategory.update({ where: { id: category.id }, data: { active: false } });
+          assert.equal(await published(evidence), false);
+          await tx.serviceCategory.update({ where: { id: category.id }, data: { active: true } });
+          await tx.technician.update({ where: { id }, data: { active: false } });
+          for (const paths of [
+            [foreignPhoto],
+            [avatar],
+            [`${ownerId}/${randomUUID()}.webp`],
+            Array(6).fill(replacement),
+          ])
+            await assert.rejects(
+              updateTechnicianProfile(tx, ownerId, { ...input, portfolioPaths: paths }),
+            );
+          await assert.rejects(
+            updateTechnicianProfile(tx, ownerId, {
+              ...input,
+              category: 'NONEXISTENT',
+              portfolioPaths: [],
+            }),
+          );
+          assert.equal(
+            await tx.userImage.count({ where: { path: evidence } }),
+            1,
+            'failed save leaves old photos in place',
+          );
+          const photoResult = await updateTechnicianProfile(tx, ownerId, {
+            ...input,
+            portfolioPaths: [replacement],
+          });
+          assert.deepEqual(photoResult.obsoletePaths, [evidence]);
+          assert.deepEqual(
+            (await tx.technician.findUniqueOrThrow({ where: { id } })).portfolioPaths,
+            [replacement],
+          );
+          assert.equal(await tx.userImage.count({ where: { path: evidence } }), 0);
+          assert.equal(await tx.userImage.count({ where: { path: replacement } }), 1);
+          assert.equal(await tx.userImage.count({ where: { path: foreignPhoto } }), 1);
+          assert.equal(await tx.userImage.count({ where: { path: avatar } }), 1);
+          const photoProfile = await tx.technician.findUniqueOrThrow({ where: { id } });
+          assert.equal(photoProfile.applicationStatus, 'APPROVED');
+          assert.equal(photoProfile.active, false);
+          assert.equal(photoProfile.applicationReviewedAt?.toISOString(), reviewedAt.toISOString());
+          assert.deepEqual(
+            await tx.booking.findUniqueOrThrow({ where: { id: booking.id } }),
+            booking,
+          );
+          const cleared = await updateTechnicianProfile(tx, ownerId, {
+            ...input,
+            portfolioPaths: [],
+          });
+          assert.deepEqual(cleared.obsoletePaths, [replacement]);
+          assert.deepEqual(
+            (await tx.technician.findUniqueOrThrow({ where: { id } })).portfolioPaths,
+            [],
+          );
+          assert.equal(await tx.userImage.count({ where: { ownerId, kind: 'PORTFOLIO' } }), 0);
           for (const status of ['PENDING', 'REJECTED'] as const) {
             await tx.technician.update({ where: { id }, data: { applicationStatus: status } });
             await assert.rejects(updateTechnicianProfile(tx, ownerId, input), /อนุมัติ/);

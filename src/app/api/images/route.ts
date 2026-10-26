@@ -5,7 +5,12 @@ import { getCurrentUser } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { prepareImage } from '@/lib/image-processing';
-import { imageBucket, MAX_PORTFOLIO_IMAGES, type ImageKind } from '@/lib/images';
+import {
+  imageBucket,
+  MAX_PORTFOLIO_IMAGES,
+  MAX_STAGED_PORTFOLIO_IMAGES,
+  type ImageKind,
+} from '@/lib/images';
 import { UserError } from '@/lib/validation';
 import { sameOrigin, limitedImageForm } from '@/lib/upload-request';
 import { imageUploadAllowed } from '@/lib/image-upload-limit';
@@ -24,15 +29,26 @@ export async function POST(request: Request) {
     if (!['AVATAR', 'PORTFOLIO'].includes(kind)) throw new UserError('ประเภทของรูปไม่ถูกต้อง');
     if (kind === 'PORTFOLIO' && user.role !== 'TECHNICIAN')
       return Response.json({ error: 'เฉพาะบัญชีช่างเท่านั้น' }, { status: 403 });
+    let portfolioLimit = MAX_PORTFOLIO_IMAGES;
+    if (kind === 'PORTFOLIO' && form.get('purpose') === 'WORK_PROFILE') {
+      const technician = await prisma.technician.findUnique({
+        where: { userId: user.id },
+        select: { applicationStatus: true },
+      });
+      if (!technician || !['APPROVED', 'NONE'].includes(technician.applicationStatus))
+        throw new UserError('กรุณารอ Admin อนุมัติก่อนแก้ไขรูปผลงาน');
+      // Keep the saved set while uploading replacements; at most five are attached on save.
+      portfolioLimit = MAX_STAGED_PORTFOLIO_IMAGES;
+    }
     const file = form.get('file');
     if (!(file instanceof File)) throw new UserError('กรุณาเลือกไฟล์รูป');
     if (!(await imageUploadAllowed(user.id)))
       return Response.json({ error: 'อัปโหลดบ่อยเกินไป กรุณาลองใหม่ภายหลัง' }, { status: 429 });
     if (
       kind === 'PORTFOLIO' &&
-      (await prisma.userImage.count({ where: { ownerId: user.id, kind } })) >= MAX_PORTFOLIO_IMAGES
+      (await prisma.userImage.count({ where: { ownerId: user.id, kind } })) >= portfolioLimit
     )
-      throw new UserError('แนบรูปได้สูงสุด 5 รูป กรุณาลบรูปเดิมก่อน');
+      throw new UserError('มีรูปที่อัปโหลดครบจำนวนแล้ว กรุณาบันทึกหรือลบรูปที่ยังไม่ได้ใช้ก่อน');
     const image = await prepareImage(file, kind);
     bucket = imageBucket(kind);
     const path = `${user.id}/${randomUUID()}.webp`;
@@ -52,7 +68,7 @@ export async function POST(request: Request) {
       async (tx) => {
         if (
           kind === 'PORTFOLIO' &&
-          (await tx.userImage.count({ where: { ownerId: user.id, kind } })) >= MAX_PORTFOLIO_IMAGES
+          (await tx.userImage.count({ where: { ownerId: user.id, kind } })) >= portfolioLimit
         )
           throw new UserError('แนบรูปได้สูงสุด 5 รูป');
         const result = await tx.userImage.create({ data: { ownerId: user.id, kind, path } });
@@ -95,8 +111,8 @@ export async function DELETE(request: Request) {
       async (tx) => {
         const technician = await tx.technician.findUnique({ where: { userId: user.id } });
         if (image.kind === 'PORTFOLIO' && technician?.portfolioPaths.includes(image.path)) {
-          if (technician.applicationStatus === 'APPROVED')
-            throw new UserError('รูปในใบสมัครที่อนุมัติแล้วให้ติดต่อ Admin เพื่อแก้ไข');
+          if (['APPROVED', 'NONE'].includes(technician.applicationStatus))
+            throw new UserError('กรุณานำรูปออกในหน้าแก้ไขข้อมูลรับงาน แล้วกดบันทึกข้อมูลรับงาน');
           await tx.technician.update({
             where: { id: technician.id },
             data: {

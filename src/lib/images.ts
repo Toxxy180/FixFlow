@@ -1,5 +1,6 @@
 export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 export const MAX_PORTFOLIO_IMAGES = 5;
+export const MAX_STAGED_PORTFOLIO_IMAGES = MAX_PORTFOLIO_IMAGES * 2;
 export const imageKinds = ['AVATAR', 'PORTFOLIO'] as const;
 export type ImageKind = (typeof imageKinds)[number];
 export const imageBucket = (kind: ImageKind) =>

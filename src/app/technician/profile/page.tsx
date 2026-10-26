@@ -12,13 +12,17 @@ export default async function TechnicianProfile() {
   });
   if (!technician || !['APPROVED', 'NONE'].includes(technician.applicationStatus))
     redirect('/technician/apply');
-  const [categories, districts] = await Promise.all([
+  const [categories, districts, images] = await Promise.all([
     prisma.serviceCategory.findMany({
       where: { OR: [{ active: true }, { id: technician.category }] },
       select: { id: true, name: true, active: true },
       orderBy: { name: 'asc' },
     }),
     prisma.district.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    prisma.userImage.findMany({
+      where: { ownerId: user.id, kind: 'PORTFOLIO', path: { in: technician.portfolioPaths } },
+      select: { id: true, path: true },
+    }),
   ]);
   return (
     <main className="shell max-w-3xl py-10">
@@ -55,6 +59,10 @@ export default async function TechnicianProfile() {
           }}
           categories={categories}
           districts={districts}
+          images={technician.portfolioPaths.flatMap((path) => {
+            const image = images.find((image) => image.path === path);
+            return image ? [{ ...image, url: `/api/images/${image.id}` }] : [];
+          })}
         />
       </section>
       <p className="mt-5 text-sm leading-relaxed text-muted">
@@ -62,7 +70,7 @@ export default async function TechnicianProfile() {
         <Link href="/account" className="font-semibold text-primary">
           บัญชีของฉัน
         </Link>{' '}
-        · รูปประกอบใบสมัครที่อนุมัติแล้วให้ติดต่อ Admin เพื่อแก้ไข
+        · รูปผลงานเพิ่มหรือแก้ไขได้ในฟอร์มนี้
       </p>
     </main>
   );

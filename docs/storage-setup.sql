@@ -1,5 +1,6 @@
 -- Run once in Supabase SQL Editor, after applying Prisma migrations.
--- Avatars are public; portfolio images are private (owner + active Admin only).
+-- Avatars are public. The portfolio bucket is private, with RLS allowing visitor
+-- reads of saved photos on approved, visible profiles (from Prisma migrations).
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES
   ('fixflow-avatars', 'fixflow-avatars', true, 2097152, ARRAY['image/jpeg','image/png','image/webp']),
@@ -31,3 +32,7 @@ CREATE POLICY fixflow_image_delete ON storage.objects FOR DELETE TO authenticate
 USING (bucket_id IN ('fixflow-avatars','fixflow-portfolios')
   AND (storage.foldername(name))[1] = (SELECT auth.uid())::text);
 -- No UPDATE policy: uploads use unique paths and never overwrite another object.
+
+DROP POLICY IF EXISTS fixflow_public_portfolio_select ON storage.objects;
+CREATE POLICY fixflow_public_portfolio_select ON storage.objects FOR SELECT TO anon, authenticated
+USING (bucket_id = 'fixflow-portfolios' AND public.fixflow_public_portfolio(name));
