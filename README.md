@@ -16,27 +16,6 @@
 - ตรวจสิทธิ์และเจ้าของข้อมูลบน server ทุก action; RLS ป้องกัน browser เรียกตารางตรง
 - รองรับมือถือ ฟอร์ม pending/error/success และสถานะว่าง
 
-## ทดลองในเครื่องก่อนสร้าง Supabase
-
-ตั้งค่าบัญชีจริงตาม [คู่มือระบบบัญชี](docs/AUTH-SETUP.md) และดู [รายการปรับปรุงระบบบัญชี](docs/ACCOUNT-CHANGES.md)
-
-ต้องมี Node.js 22 หรือ 24 และติดตั้ง dependencies ด้วย `npm install`
-
-เปิด Terminal แรก:
-
-```powershell
-npm run db:local
-```
-
-ใช้ TCP `DATABASE_URL` ที่ Prisma แสดง ใส่ใน `.env` ทั้ง `DATABASE_URL` และ `DIRECT_URL` เปลี่ยน host เป็น `127.0.0.1` และ `connection_limit=1` สำหรับฐานข้อมูลทดลองในเครื่อง เพิ่ม `&pgbouncer=true` ใน query string เพื่อใช้กับ local proxy และเว้นค่า Supabase URL/key ว่าง
-
-เปิด Terminal ที่สอง:
-
-```powershell
-npm run db:setup
-npm run db:seed:demo
-npm run dev:demo
-```
 ## คำสั่งตรวจงาน
 
 ```powershell
