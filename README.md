@@ -37,19 +37,6 @@ npm run db:setup
 npm run db:seed:demo
 npm run dev:demo
 ```
-
-เปิด http://127.0.0.1:3000/login แล้วเลือก ทดลองลูกค้า / ทดลองช่าง / ทดลองAdmin
-
-ใน workspace ที่เตรียมให้ มี `.env` ของฐานข้อมูลในเครื่องและ seed แล้ว โหมดสาธิตใช้ได้เฉพาะ development กับ database localhost และ Supabase ที่ยังไม่เชื่อม ไม่ส่ง OTP จริง ไม่ทำงานใน production/Vercel
-
-หากปิด Terminal ฐานข้อมูลหรือเว็บ ให้เปิดสองคำสั่ง `db:local` และ `dev:demo` อีกครั้ง ข้อมูล PostgreSQL ในเครื่องเก็บแยกตาม instance ชื่อ `fixflow`
-
-## ใช้ Supabase และนำขึ้นออนไลน์
-
-ทำตาม [คู่มือ Deploy](docs/DEPLOY.md) มีขั้นตอนสร้างตาราง ตั้ง runtime database role, Email Templates/SMTP, Admin คนแรก และ Vercel environment variables
-
-หลังเชื่อม Supabase แล้ว ใช้ `npm run dev` หรือ production build ตามปกติ ไม่ใช้ demo accounts โหมด OTP จริงต้องมี Supabase project และ SMTP ที่ส่งถึงผู้ทดสอบได้
-
 ## คำสั่งตรวจงาน
 
 ```powershell
@@ -87,11 +74,7 @@ tests/                     Unit และ PostgreSQL integration tests
 docs/                      Deploy, ขอบเขตงาน และแนวทางภาพออกแบบ
 ```
 
-## ขอบเขตและข้อมูลเดิม
-
-QR PromptPay ใช้โอนเงินจริงให้เบอร์ช่างได้เมื่อผูกธนาคารแล้ว แต่สถานะชำระเงินเป็นแบบจำลองและไม่มีการตรวจยอดโอน และยังไม่มี chat หรือ GPS ราคาปัจจุบันเป็นจำนวนบาทเต็ม รองรับรูปโปรไฟล์และรูปใบสมัครช่างผ่าน Supabase Storage
-
-SQLite เดิมยังเก็บอยู่ที่ `prisma/dev.db` (gitignored) และเก็บ schema/migration เดิมใน `prisma/legacy-sqlite/` ไม่ได้นำรายการ anonymous เดิมมาเป็นงานของบัญชีใหม่โดยอัตโนมัติ เพราะยังไม่มีข้อมูลจับคู่เจ้าของบัญชี
+ma/dev.db` (gitignored) และเก็บ schema/migration เดิมใน `prisma/legacy-sqlite/` ไม่ได้นำรายการ anonymous เดิมมาเป็นงานของบัญชีใหม่โดยอัตโนมัติ เพราะยังไม่มีข้อมูลจับคู่เจ้าของบัญชี
 
 รายละเอียดสโคปและแนวทางสาธิต: [Mini Project](docs/MINI-PROJECT.md)
 
