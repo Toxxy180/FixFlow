@@ -1,6 +1,6 @@
 > การตั้งค่ารุ่นล่าสุด: อ่าน [Role, PromptPay และ Reset password](docs/FINAL-SETUP.md) ก่อน deploy โดยเฉพาะเทมเพลต Reset password แบบ TokenHash
 
-# FixFlow — WebApps Mini Project - Version2 - Pull
+# FixFlow — WebApps Mini Project - Final
 
 ระบบจองช่างในกรุงเทพมหานคร 50 เขต ด้วย Next.js 16, TypeScript, Tailwind CSS 4, Prisma 6 และ PostgreSQL พร้อม Supabase Auth: อีเมล/รหัสผ่าน, OTP ยืนยันสมัครสมาชิกครั้งเดียว
 
